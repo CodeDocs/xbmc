@@ -1,6 +1,10 @@
 # CodeDocs Configuration File
 
 DOXYFILE = doxygen_resources/Doxyfile.doxy 
+PROJECT_LOGO           = doxygen_resources/Thumbnail-symbol-whitebg-small.jpg
+INPUT                  = xbmc \
+                         CODING_GUIDELINES.dox \
+                         doxygen_resources
 
 # Specify external repository to link documentation with.
 # This is similar to Doxygen's TAGFILES option, but will automatically link to
