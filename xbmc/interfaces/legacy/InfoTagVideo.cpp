@@ -119,7 +119,7 @@ namespace XBMCAddon
 
     String InfoTagVideo::getIMDBNumber()
     {
-      return infoTag->m_strIMDBNumber;
+      return infoTag->GetUniqueID();
     }
 
     int InfoTagVideo::getSeason()
@@ -140,6 +140,11 @@ namespace XBMCAddon
     double InfoTagVideo::getRating()
     {
       return infoTag->GetRating().rating;
+    }
+
+    int InfoTagVideo::getUserRating()
+    {
+      return infoTag->m_iUserRating;
     }
 
     int InfoTagVideo::getPlayCount()

@@ -26,13 +26,14 @@
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/Environment.h"
+#include <cdio/cdio.h>
 #include <cdio/logging.h>
 #include <cdio/util.h>
 #include <cdio/mmc.h>
 #include <cdio/cd_types.h>
 
 #if defined(TARGET_WINDOWS)
-#pragma comment(lib, "libcdio.dll.lib")
+#pragma comment(lib, "libcdio.lib")
 #endif
 
 using namespace MEDIA_DETECT;
@@ -502,7 +503,7 @@ bool CCdIoSupport::IsIt(int num)
   signature_t *sigp = &sigs[num];
   int len = strlen(sigp->sig_str);
 
-  /* TODO: check that num < largest sig. */
+  //! @todo check that num < largest sig.
   return 0 == memcmp(&buffer[sigp->buf_num][sigp->offset], sigp->sig_str, len);
 }
 

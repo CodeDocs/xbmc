@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([kodi], [16.9.702], [http://trac.kodi.tv])
+AC_INIT([kodi], [16.9.801], [http://trac.kodi.tv])
 AC_CONFIG_HEADERS([xbmc/config.h])
 AH_TOP([#pragma once])
 m4_include([m4/ax_prog_cc_for_build.m4])
@@ -186,8 +186,6 @@ vaapi_not_found="== Could not find libva. VAAPI support disabled. =="
 vaapi_disabled="== VAAPI support manually disabled. =="
 openmax_disabled="== OpenMax support manually disabled. =="
 openmax_not_found="== Could not find OpenMax headers. OpenMax support disabled. =="
-librtmp_not_found="== Could not find libRTMP. RTMP support disabled. =="
-librtmp_disabled="== RTMP support disabled. =="
 libnfs_not_found="== Could not find libnfs. NFS client support disabled. =="
 libnfs_disabled="== NFS support disabled. =="
 libshairplay_not_found="== Could not find libshairplay. =="
@@ -200,8 +198,6 @@ libcap_disabled="== Capabilities detection support disabled. =="
 libcap_not_found="== Could not find libcap. Capabilities detection support disabled. =="
 gtest_enabled="== Google Test Framework will be configured. =="
 gtest_disabled="== Google Test Framework will not be configured. =="
-breakpad_enabled="== Google Breakpad will be configured. =="
-breakpad_disabled="== Google Breakpad Framework will not be configured. =="
 
 libudev_not_found="== Could not find libudev. Will use polling to check for device changes. =="
 libudev_disabled="== udev support disabled. Will use polling to check for device changes. =="
@@ -210,6 +206,9 @@ libusb_disabled="== libusb disabled. Plug and play USB device support will not b
 libusb_disabled_udev_found="== libusb disabled. =="
 libcec_enabled="== libcec enabled. =="
 libcec_disabled="== libcec disabled. CEC adapter support will not be available. =="
+lcms2_enabled="== lcms2 enabled. =="
+lcms2_not_found="== Could not find lcms2. ICC profile support will not be available. =="
+lcms2_disabled="== lcms2 disabled. ICC profile support will not be available. =="
 libbluetooth_not_found="== Could not find libbluetooth. Bluetooth support will not be available =="
 libbluetooth_enabled="== libbluetooth enabled. =="
 libbluetooth_disabled="== libbluetooth disabled. Bluetooth support will not be available. =="
@@ -323,12 +322,6 @@ AC_ARG_ENABLE([ssh],
   [use_ssh=$enableval],
   [use_ssh=yes])
 
-AC_ARG_ENABLE([rtmp],
-  [AS_HELP_STRING([--enable-rtmp],
-  [enable RTMP support via librtmp (default is auto)])],
-  [use_librtmp=$enableval],
-  [use_librtmp=auto])
-
 AC_ARG_ENABLE([samba],
   [AS_HELP_STRING([--disable-samba],
   [disable SAMBA support (default is enabled)])],
@@ -379,7 +372,7 @@ AC_ARG_ENABLE([avahi],
 
 AC_ARG_ENABLE([non-free],
   [AS_HELP_STRING([--disable-non-free],
-  [disable componentents with non-compliant licenses])],
+  [disable components with non-compliant licenses])],
   [use_nonfree=$enableval],
   [use_nonfree=yes])
 
@@ -406,6 +399,12 @@ AC_ARG_ENABLE([libbluray],
   [enable libbluray support])],
   [use_libbluray=$enableval],
   [use_libbluray=auto])
+
+AC_ARG_ENABLE([libxslt],
+  [AS_HELP_STRING([--disable-libxslt],
+  [enable libxslt (XSLT scrapers) support (default is enabled)])],
+  [use_libxslt=$enableval],
+  [use_libxslt=yes])
 
 AC_ARG_ENABLE([texturepacker],
   [AS_HELP_STRING([--enable-texturepacker],
@@ -444,6 +443,12 @@ AC_ARG_ENABLE([libcec],
   [use_libcec=$enableval],
   [use_libcec=auto])
 
+AC_ARG_ENABLE([lcms2],
+  [AS_HELP_STRING([--enable-lcms2],
+  [enable lcms2 support (default is auto)])],
+  [use_lcms2=$enableval],
+  [use_lcms2=auto])
+
 AC_ARG_ENABLE([libbluetooth],
   [AS_HELP_STRING([--enable-libbluetooth],
   [enable libbluetooth support (default is auto)])],
@@ -467,12 +472,6 @@ AC_ARG_ENABLE([gtest],
   [configure Google Test Framework (default is yes)])],
   [configure_gtest=$enableval],
   [configure_gtest=yes])
-
-AC_ARG_ENABLE([breakpad],
-  [AS_HELP_STRING([--enable-breakpad],
-  [configure Google Breakpad (default is no)])],
-  [use_breakpad=$enableval],
-  [use_breakpad=no])
 
 AC_ARG_ENABLE([codec],
   [AS_HELP_STRING([--enable-codec],
@@ -735,11 +734,7 @@ else
     DEBUG_FLAGS="-pg -DNDEBUG=1"
   else
     final_message="$final_message\n  Profiling:\tNo"
-    if test "$use_breakpad" = "yes"; then
-       DEBUG_FLAGS="-g -DNDEBUG=1"
-    else
-       DEBUG_FLAGS="-DNDEBUG=1"
-    fi
+    DEBUG_FLAGS="-DNDEBUG=1"
   fi
 fi
 CFLAGS="$DEBUG_FLAGS $CFLAGS"
@@ -1067,12 +1062,22 @@ if test "$target_platform" = "target_android" ; then
   AC_CHECK_LIB([log],         [__android_log_vprint],, AC_MSG_ERROR($missing_library))
   AC_CHECK_LIB([jnigraphics],     [main],, AC_MSG_ERROR($missing_library))
 fi
-PKG_CHECK_MODULES([LIBXML], [libxml-2.0],
-  [INCLUDES="$INCLUDES $LIBXML_CFLAGS"; LIBS="$LIBS $LIBXML_LIBS"],
-  AC_MSG_ERROR($missing_library))
-PKG_CHECK_MODULES([LIBXSLT], [libxslt],
-  [INCLUDES="$INCLUDES $LIBXSLT_CFLAGS"; LIBS="$LIBS $LIBXSLT_LIBS"],
-  AC_MSG_ERROR($missing_library))
+
+# check for libbxslt
+AS_CASE([x$use_libxslt],
+  [xyes],[
+    PKG_CHECK_MODULES([LIBXML], [libxml-2.0],
+      [INCLUDES="$INCLUDES $LIBXML_CFLAGS"; LIBS="$LIBS $LIBXML_LIBS"],
+      AC_MSG_ERROR($missing_library))
+    PKG_CHECK_MODULES([LIBXSLT], [libxslt],
+      [INCLUDES="$INCLUDES $LIBXSLT_CFLAGS"; LIBS="$LIBS $LIBXSLT_LIBS"],
+      AC_MSG_ERROR($missing_library))
+    AC_DEFINE([HAVE_LIBXSLT], 1, [System has libxslt library])
+    AC_SUBST([HAVE_LIBXSLT], 1)
+  ],[
+    AC_SUBST([HAVE_LIBXSLT], 0)
+  ]
+)
 PKG_CHECK_MODULES([FRIBIDI],    [fribidi],
   [INCLUDES="$INCLUDES $FRIBIDI_CFLAGS"; LIBS="$LIBS $FRIBIDI_LIBS"],
   AC_MSG_ERROR($missing_library))
@@ -1090,7 +1095,7 @@ PKG_CHECK_MODULES([PCRE],       [libpcre],
 PKG_CHECK_MODULES([FREETYPE2],  [freetype2],
   [INCLUDES="$INCLUDES $FREETYPE2_CFLAGS"; LIBS="$LIBS $FREETYPE2_LIBS"],
   AC_MSG_ERROR($missing_library))
-PKG_CHECK_MODULES([TAGLIB],  [taglib >= 1.8],
+PKG_CHECK_MODULES([TAGLIB],  [taglib >= 1.9],
   [INCLUDES="$INCLUDES $TAGLIB_CFLAGS"; LIBS="$LIBS $TAGLIB_LIBS"],
   AC_MSG_ERROR($missing_library))
 
@@ -1285,26 +1290,6 @@ else
     AC_MSG_ERROR(libssh not found))
 fi
 
-# libRTMP
-if test "$use_librtmp" != "no"; then
-  AC_CHECK_HEADERS([librtmp/log.h librtmp/amf.h librtmp/rtmp.h],,
-   [if test "$use_librtmp" = "yes"; then
-      AC_MSG_ERROR($librtmp_not_found)
-    elif test "$use_librtmp" != "no"; then
-      AC_MSG_NOTICE($librtmp_not_found)
-      use_librtmp="no"
-    fi
-   ])
-  if test "$use_librtmp" != "no"; then
-    XB_FIND_SONAME([RTMP], [rtmp], [use_librtmp])
-  fi
-  if test "$use_librtmp" != "no"; then
-    AC_DEFINE([HAS_LIBRTMP], [1], [Whether to use libRTMP library.])
-  fi
-else
-  AC_MSG_NOTICE($librtmp_disabled)
-fi
-
 # samba
 if test "x$use_samba" != "xno"; then
   PKG_CHECK_MODULES([SAMBA], [smbclient],
@@ -1454,6 +1439,21 @@ if test "x$use_libcec" != "xno"; then
 else
   use_libcec="no"
   AC_MSG_NOTICE($libcec_disabled)
+fi
+
+# lcms2
+if test "$use_lcms2" = "auto"; then
+  PKG_CHECK_MODULES([LCMS2],[lcms2],,[use_lcms2="no";AC_MSG_RESULT($lcms2_not_found)])
+elif test "$use_lcms2" = "yes" ; then
+  PKG_CHECK_MODULES([LCMS2],[lcms2],,[use_lcms2="no";AC_MSG_ERROR($lcms2_not_found)])
+else
+  AC_MSG_NOTICE($lcms2_disabled)
+fi
+
+if test "x$use_lcms2" != "xno"; then
+  USE_LCMS2=1;INCLUDES="$INCLUDES $LCMS2_CFLAGS";LIBS="$LIBS $LCMS2_LIBS"
+  AC_DEFINE([HAVE_LCMS2],[1],["Define to 1 if lcms2 is installed"])
+  AC_MSG_NOTICE($lcms2_enabled)
 fi
 
 # libbluetooth
@@ -1670,7 +1670,7 @@ if test "x$use_vaapi" != "xno"; then
   else
     initial_val=$use_vaapi
     if test "x$use_vaapi" != "xno"; then
-      PKG_CHECK_MODULES([LIBVA], [libva libva-x11],
+      PKG_CHECK_MODULES([LIBVA], [libva >= 0.38 libva-x11 >= 0.38],
         [INCLUDES="$INCLUDES $LIBVA_CFLAGS"; LIBS="$LIBS $LIBVA_LIBS"; USE_VAAPI=1;
          AC_DEFINE([HAVE_LIBVA], [1], [Define to 1 if you have the 'vaapi' libraries])],
         [use_vaapi="no"; USE_VAAPI=0; AC_MSG_RESULT($vaapi_not_found)])
@@ -1886,6 +1886,12 @@ else
   final_message="$final_message\n  Bluray:\tNo"
 fi
 
+if test "$use_libxslt" = "yes"; then
+  final_message="$final_message\n  XSLT scrapers:\tYes"
+else
+  final_message="$final_message\n  XSLT scrapers:\tNo"
+fi
+
 if test "x$use_texturepacker" != "xno"; then
   AC_PATH_PROG([TEXTUREPACKER], [TexturePacker], ["none"],
     [$PATH$PATH_SEPARATOR${abs_top_srcdir}/tools/depends/native/TexturePacker/bin])
@@ -1965,21 +1971,6 @@ else
   SKIP_CONFIG_GTEST=1
 fi
 
-# Google Breakpad
-if test "$use_breakpad" = "yes"; then
-  USE_BREAKPAD=1
-  PKG_CHECK_MODULES([BREAKPAD],    [breakpad-client],
-    [INCLUDES="$INCLUDES $BREAKPAD_CFLAGS"; LIBS="$LIBS $BREAKPAD_LIBS"],
-    AC_MSG_ERROR("breakpad-client not found"))
-  AC_DEFINE([HAVE_BREAKPAD],[1],["Define to 1 if Google Breakpad is installed"])
-  AC_MSG_NOTICE($breakpad_enabled)
-  final_message="$final_message\n  Google Breakpad Configured:\tYes"
-else
-  AC_MSG_NOTICE($breakpad_disabled)
-  final_message="$final_message\n  Google Breakpad Configured:\tNo"
-  USE_BREAKPAD=0
-fi
-
 if test "$use_avahi" = "yes"; then
   final_message="$final_message\n  Avahi:\tYes"
 else
@@ -2020,12 +2011,6 @@ if test "$use_libssh" != "no"; then
   final_message="$final_message\n  libssh support:\tYes"
 else
   final_message="$final_message\n  libssh support:\tNo"
-fi
-
-if test "$use_librtmp" != "no"; then
-  final_message="$final_message\n  libRTMP support:\tYes"
-else
-  final_message="$final_message\n  libRTMP support:\tNo"
 fi
 
 if test "x$use_samba" != "xno"; then
@@ -2084,6 +2069,12 @@ if test "x$use_libcec" != "xno"; then
   final_message="$final_message\n  libcec support:\tYes"
 else
   final_message="$final_message\n  libcec support:\tNo"
+fi
+
+if test "x$use_lcms2" != "xno"; then
+  final_message="$final_message\n  lcms2 support:\tYes"
+else
+  final_message="$final_message\n  lcms2 support:\tNo"
 fi
 
 if test "x$use_libbluetooth" != "xno"; then
@@ -2198,7 +2189,6 @@ OUTPUT_FILES="Makefile \
     xbmc/platform/darwin/osx/Info.plist \
     xbmc/platform/darwin/ios/Info.plist \
     project/cmake/KodiConfig.cmake \
-    project/cmake/XBMCConfig.cmake \
     tools/android/packaging/xbmc/AndroidManifest.xml \
     tools/android/packaging/Makefile \
     tools/android/packaging/xbmc/src/org/xbmc/kodi/Splash.java \
@@ -2301,7 +2291,6 @@ AC_SUBST(USE_SSE4)
 AC_SUBST(USE_MMAL)
 AC_SUBST(USE_X11)
 AC_SUBST(USE_OPTICAL_DRIVE)
-AC_SUBST(USE_BREAKPAD)
 AC_SUBST(CROSS_COMPILING)
 
 # pushd and popd are not available in other shells besides bash, so implement

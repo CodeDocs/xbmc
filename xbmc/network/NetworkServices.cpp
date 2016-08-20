@@ -441,7 +441,7 @@ void CNetworkServices::OnSettingChanged(const CSetting *setting)
       settingId == CSettings::SETTING_SMB_WORKGROUP)
   {
     // okey we really don't need to restart, only deinit samba, but that could be damn hard if something is playing
-    // TODO - General way of handling setting changes that require restart
+    //! @todo - General way of handling setting changes that require restart
     if (HELPERS::ShowYesNoDialogText(CVariant{14038}, CVariant{14039}) == DialogResponse::YES)
     {
       CSettings::GetInstance().Save();
@@ -827,9 +827,20 @@ bool CNetworkServices::StartUPnP()
   bool ret = false;
 #ifdef HAS_UPNP
   ret |= StartUPnPClient();
-  ret |= StartUPnPServer();
-  ret |= StartUPnPController();
-  ret |= StartUPnPRenderer();
+  if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPSERVER))
+  {
+   ret |= StartUPnPServer();
+  }
+
+  if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPCONTROLLER))
+  {
+    ret |= StartUPnPController();
+  }
+
+  if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPRENDERER))
+  {
+    ret |= StartUPnPRenderer();
+  }
 #endif // HAS_UPNP
   return ret;
 }
