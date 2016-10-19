@@ -1,6 +1,9 @@
 # CodeDocs Configuration File
-
-DOXYFILE = doxygen_resources/Doxyfile.doxy 
+DOXYFILE               = doxygen_resources/Doxyfile.doxy 
+PROJECT_LOGO           = doxygen_resources/Thumbnail-symbol-whitebg-small.jpg
+INPUT                  = xbmc \
+                         CODING_GUIDELINES.dox \
+                         doxygen_resources
 
 ALIASES                = "table_start=<table width= 100% style= border bgcolor= 576f9f border= 0>" \
                          "table_end=</table>" \
