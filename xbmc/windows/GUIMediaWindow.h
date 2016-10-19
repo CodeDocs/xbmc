@@ -38,19 +38,19 @@ public:
   virtual ~CGUIMediaWindow(void);
 
   // specializations of CGUIControl
-  virtual bool OnAction(const CAction &action);
-  virtual bool OnBack(int actionID);
-  virtual bool OnMessage(CGUIMessage& message);
+  virtual bool OnAction(const CAction &action) override;
+  virtual bool OnBack(int actionID) override;
+  virtual bool OnMessage(CGUIMessage& message) override;
 
   // specializations of CGUIWindow
-  virtual void OnWindowLoaded();
-  virtual void OnWindowUnload();
-  virtual void OnInitWindow();
-  virtual bool IsMediaWindow() const { return true; }
-  int GetViewContainerID() const { return m_viewControl.GetCurrentControl(); }
-  int GetViewCount() const { return m_viewControl.GetViewModeCount(); };
-  virtual bool HasListItems() const { return true; }
-  virtual CFileItemPtr GetCurrentListItem(int offset = 0);
+  virtual void OnWindowLoaded() override;
+  virtual void OnWindowUnload() override;
+  virtual void OnInitWindow() override;
+  virtual bool IsMediaWindow() const  override { return true; }
+  int GetViewContainerID() const  override { return m_viewControl.GetCurrentControl(); }
+  int GetViewCount() const  override { return m_viewControl.GetViewModeCount(); };
+  virtual bool HasListItems() const  override { return true; }
+  virtual CFileItemPtr GetCurrentListItem(int offset = 0) override;
 
   // custom methods
   virtual bool CanFilterAdvanced() { return m_canFilterAdvanced; }
@@ -61,13 +61,14 @@ public:
 
   const CFileItemList &CurrentDirectory() const;
   const CGUIViewState *GetViewState() const;
+  virtual bool UseFileDirectories() { return true; }
 
 protected:
   // specializations of CGUIControlGroup
-  virtual CGUIControl *GetFirstFocusableControl(int id);
+  virtual CGUIControl *GetFirstFocusableControl(int id) override;
 
   // specializations of CGUIWindow
-  virtual void LoadAdditionalTags(TiXmlElement *root);
+  virtual void LoadAdditionalTags(TiXmlElement *root) override;
 
   // custom methods
   virtual void SetupShares();

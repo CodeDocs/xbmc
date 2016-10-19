@@ -102,11 +102,9 @@ public:
 
   virtual bool BeginRender() = 0;
   virtual bool EndRender() = 0;
-  virtual void PresentRender(bool rendered) = 0;
+  virtual void PresentRender(bool rendered, bool videoLayer) = 0;
   virtual bool ClearBuffers(color_t color) = 0;
   virtual bool IsExtSupported(const char* extension) = 0;
-
-  virtual void FinishPipeline() {};
 
   virtual void SetViewPort(CRect& viewPort) = 0;
   virtual void GetViewPort(CRect& viewPort) = 0;

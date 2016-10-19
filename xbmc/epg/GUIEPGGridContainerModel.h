@@ -31,21 +31,22 @@ class CFileItemList;
 
 namespace EPG
 {
-  struct GridItemsPtr
+  struct GridItem
   {
     CFileItemPtr item;
     float originWidth;
     float width;
     int progIndex;
 
-    GridItemsPtr() : originWidth(0.0), width(0.0), progIndex(-1) {}
+    GridItem() : originWidth(0.0f), width(0.0f), progIndex(-1) {}
   };
 
   class CGUIEPGGridContainerModel
   {
   public:
-    static const int MINSPERBLOCK = 5; // minutes
-    static const int MAXBLOCKS    = 33 * 24 * 60 / MINSPERBLOCK; //! 33 days of 5 minute blocks (31 days for upcoming data + 1 day for past data + 1 day for fillers)
+    static const int MINSPERBLOCK       = 5; // minutes
+    static const int MAXBLOCKS          = 33 * 24 * 60 / MINSPERBLOCK; //! 33 days of 5 minute blocks (31 days for upcoming data + 1 day for past data + 1 day for fillers)
+    static const int GRID_START_PADDING = 30; // minutes; latest grid start 'now - GRID_START_PADDING', will be adjusted to this value if shall be set to later
 
     CGUIEPGGridContainerModel() : m_blocks(0) {}
     virtual ~CGUIEPGGridContainerModel() { Reset(); }
@@ -72,7 +73,7 @@ namespace EPG
 
     int GetBlockCount() const { return m_blocks; }
     bool HasGridItems() const { return !m_gridIndex.empty(); }
-    GridItemsPtr *GetGridItemPtr(int iChannel, int iBlock) { return &m_gridIndex[iChannel][iBlock]; }
+    GridItem *GetGridItemPtr(int iChannel, int iBlock) { return &m_gridIndex[iChannel][iBlock]; }
     CFileItemPtr GetGridItem(int iChannel, int iBlock) const { return m_gridIndex[iChannel][iBlock].item; }
     float GetGridItemWidth(int iChannel, int iBlock) const { return m_gridIndex[iChannel][iBlock].width; }
     float GetGridItemOriginWidth(int iChannel, int iBlock) const { return m_gridIndex[iChannel][iBlock].originWidth; }
@@ -100,7 +101,7 @@ namespace EPG
     std::vector<CFileItemPtr> m_channelItems;
     std::vector<CFileItemPtr> m_rulerItems;
     std::vector<ItemsPtr> m_epgItemsPtr;
-    std::vector<std::vector<GridItemsPtr> > m_gridIndex;
+    std::vector<std::vector<GridItem> > m_gridIndex;
 
     int m_blocks;
   };

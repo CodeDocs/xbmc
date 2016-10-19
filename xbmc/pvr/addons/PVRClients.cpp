@@ -68,16 +68,6 @@ CPVRClients::~CPVRClients(void)
   Unload();
 }
 
-bool CPVRClients::IsInUse(const std::string& strAddonId) const
-{
-  CSingleLock lock(m_critSection);
-
-  for (const auto &client : m_clientMap)
-    if (!CAddonMgr::GetInstance().IsAddonDisabled(client.second->ID()) && client.second->ID() == strAddonId)
-      return true;
-  return false;
-}
-
 void CPVRClients::Start(void)
 {
   CAddonMgr::GetInstance().RegisterAddonMgrCallback(ADDON_PVRDLL, this);
@@ -888,23 +878,6 @@ bool CPVRClients::HasMenuHooks(int iClientID, PVR_MENUHOOK_CAT cat)
       client->HaveMenuHooks(cat));
 }
 
-bool CPVRClients::GetMenuHooks(int iClientID, PVR_MENUHOOK_CAT cat, PVR_MENUHOOKS *hooks)
-{
-  bool bReturn(false);
-
-  if (iClientID < 0)
-    iClientID = GetPlayingClientID();
-
-  PVR_CLIENT client;
-  if (GetCreatedClient(iClientID, client) && client->HaveMenuHooks(cat))
-  {
-    *hooks = *(client->GetMenuHooks());
-    bReturn = true;
-  }
-
-  return bReturn;
-}
-
 void CPVRClients::ProcessMenuHooks(int iClientID, PVR_MENUHOOK_CAT cat, const CFileItem *item)
 {
   // get client id
@@ -1139,8 +1112,6 @@ bool CPVRClients::IsKnownClient(const AddonPtr client) const
 void CPVRClients::UpdateAddons(void)
 {
   VECADDONS addons;
-  PVR_CLIENT addon;
-
   CAddonMgr::GetInstance().GetInstalledAddons(addons, ADDON_PVRDLL);
 
   if (addons.empty())
@@ -1169,7 +1140,7 @@ void CPVRClients::UpdateAddons(void)
         PVR_CLIENT pvrclient = std::dynamic_pointer_cast<CPVRClient>(addon);
         if (!pvrclient)
         {
-          CLog::Log(LOGERROR, "CPVRClients::UpdateAndInitialiseClients - severe error, incorrect add type");
+          CLog::Log(LOGERROR, "CPVRClients - %s - severe error, incorrect add-on type", __FUNCTION__);
           continue;
         }
         status = pvrclient.get()->Create(iClientId);
@@ -1191,9 +1162,10 @@ void CPVRClients::UpdateAddons(void)
         }
       }
     }
-    else if (!bEnabled && IsCreatedClient(addon))
+    else if (IsCreatedClient(addon))
     {
-      StopClient(addon, false);
+      // stop add-on if it's no longer enabled, restart add-on if it's still enabled
+      StopClient(addon, bEnabled);
     }
   }
 
@@ -1402,14 +1374,6 @@ int64_t CPVRClients::SeekStream(int64_t iFilePosition, int iWhence/* = SEEK_SET*
   return -EINVAL;
 }
 
-int64_t CPVRClients::GetStreamPosition(void)
-{
-  PVR_CLIENT client;
-  if (GetPlayingClient(client))
-    return client->GetStreamPosition();
-  return -EINVAL;
-}
-
 void CPVRClients::PauseStream(bool bPaused)
 {
   PVR_CLIENT client;
@@ -1453,12 +1417,6 @@ bool CPVRClients::IsPlayingRecording(void) const
 {
   CSingleLock lock(m_critSection);
   return m_bIsPlayingRecording;
-}
-
-bool CPVRClients::IsReadingLiveStream(void) const
-{
-  CSingleLock lock(m_critSection);
-  return m_bIsPlayingLiveTV;
 }
 
 bool CPVRClients::IsEncrypted(void) const

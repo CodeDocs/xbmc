@@ -229,14 +229,14 @@ void CGUIDialogVideoInfo::OnInitWindow()
   m_hasUpdatedUserrating = false;
   m_bViewReview = true;
 
-  CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_REFRESH, (CProfilesManager::GetInstance().GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser) && !StringUtils::StartsWithNoCase(m_movieItem->GetVideoInfoTag()->m_strIMDBNumber, "xx"));
-  CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_GET_THUMB, (CProfilesManager::GetInstance().GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser) && !StringUtils::StartsWithNoCase(m_movieItem->GetVideoInfoTag()->m_strIMDBNumber.c_str() + 2, "plugin"));
+  CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_REFRESH, (CProfilesManager::GetInstance().GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser) && !StringUtils::StartsWithNoCase(m_movieItem->GetVideoInfoTag()->GetUniqueID(), "xx"));
+  CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_GET_THUMB, (CProfilesManager::GetInstance().GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser) && !StringUtils::StartsWithNoCase(m_movieItem->GetVideoInfoTag()->GetUniqueID().c_str() + 2, "plugin"));
   // Disable video user rating button for plugins as they don't have tables to save this
   CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_USERRATING, !m_movieItem->IsPlugin());
 
   VIDEODB_CONTENT_TYPE type = (VIDEODB_CONTENT_TYPE)m_movieItem->GetVideoContentType();
   if (type == VIDEODB_CONTENT_TVSHOWS || type == VIDEODB_CONTENT_MOVIES)
-    CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_GET_FANART, (CProfilesManager::GetInstance().GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser) && !StringUtils::StartsWithNoCase(m_movieItem->GetVideoInfoTag()->m_strIMDBNumber.c_str() + 2, "plugin"));
+    CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_GET_FANART, (CProfilesManager::GetInstance().GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser) && !StringUtils::StartsWithNoCase(m_movieItem->GetVideoInfoTag()->GetUniqueID().c_str() + 2, "plugin"));
   else
     CONTROL_DISABLE(CONTROL_BTN_GET_FANART);
 
@@ -458,12 +458,18 @@ void CGUIDialogVideoInfo::OnSearch(std::string& strSearch)
     pDlgSelect->Reset();
     pDlgSelect->SetHeading(CVariant{283});
 
+    CVideoThumbLoader loader;
     for (int i = 0; i < (int)items.Size(); i++)
     {
-      CFileItemPtr pItem = items[i];
-      pDlgSelect->Add(pItem->GetLabel());
+      if (items[i]->HasVideoInfoTag() &&
+          items[i]->GetVideoInfoTag()->m_playCount > 0)
+        items[i]->SetLabel2(g_localizeStrings.Get(16102));
+
+      loader.LoadItem(items[i].get());
+      pDlgSelect->Add(*items[i]);
     }
 
+    pDlgSelect->SetUseDetails(true);
     pDlgSelect->Open();
 
     int iItem = pDlgSelect->GetSelectedItem();
@@ -676,7 +682,7 @@ void CGUIDialogVideoInfo::OnGetArt()
   if (type.empty())
     return; // cancelled
 
-  // TODO: this can be removed once these are unified.
+  //! @todo this can be removed once these are unified.
   if (type == "fanart")
     OnGetFanart();
   else
@@ -688,6 +694,7 @@ void CGUIDialogVideoInfo::OnGetArt()
     {
       CFileItemPtr item(new CFileItem("thumb://Current", false));
       item->SetArt("thumb", m_movieItem->GetArt(type));
+      item->SetIconImage("DefaultPicture.png");
       item->SetLabel(g_localizeStrings.Get(13512));
       items.Add(item);
     }
@@ -695,6 +702,7 @@ void CGUIDialogVideoInfo::OnGetArt()
     { // add the 'thumb' type in
       CFileItemPtr item(new CFileItem("thumb://Thumb", false));
       item->SetArt("thumb", currentArt["thumb"]);
+      item->SetIconImage("DefaultPicture.png");
       item->SetLabel(g_localizeStrings.Get(13512));
       items.Add(item);
     }
@@ -712,7 +720,7 @@ void CGUIDialogVideoInfo::OnGetArt()
       item->SetIconImage("DefaultPicture.png");
       item->SetLabel(g_localizeStrings.Get(13513));
 
-      // TODO: Do we need to clear the cached image?
+      //! @todo Do we need to clear the cached image?
       //    CTextureCache::GetInstance().ClearCachedImage(thumb);
       items.Add(item);
     }
@@ -722,6 +730,7 @@ void CGUIDialogVideoInfo::OnGetArt()
     {
       CFileItemPtr item(new CFileItem("thumb://Local", false));
       item->SetArt("thumb", localThumb);
+      item->SetIconImage("DefaultPicture.png");
       item->SetLabel(g_localizeStrings.Get(13514));
       items.Add(item);
     }
@@ -730,7 +739,7 @@ void CGUIDialogVideoInfo::OnGetArt()
       // which is probably the IMDb thumb.  These could be wrong, so allow the user
       // to delete the incorrect thumb
       CFileItemPtr item(new CFileItem("thumb://None", false));
-      item->SetIconImage("DefaultVideo.png");
+      item->SetIconImage("DefaultPicture.png");
       item->SetLabel(g_localizeStrings.Get(13515));
       items.Add(item);
     }
@@ -794,6 +803,7 @@ void CGUIDialogVideoInfo::OnGetFanart()
   {
     CFileItemPtr itemCurrent(new CFileItem("fanart://Current",false));
     itemCurrent->SetArt("thumb", m_movieItem->GetArt("fanart"));
+    itemCurrent->SetIconImage("DefaultPicture.png");
     itemCurrent->SetLabel(g_localizeStrings.Get(20440));
     items.Add(itemCurrent);
   }
@@ -808,7 +818,7 @@ void CGUIDialogVideoInfo::OnGetFanart()
     item->SetIconImage("DefaultPicture.png");
     item->SetLabel(g_localizeStrings.Get(20441));
 
-    // TODO: Do we need to clear the cached image?
+    //! @todo Do we need to clear the cached image?
 //    CTextureCache::GetInstance().ClearCachedImage(thumb);
     items.Add(item);
   }
@@ -819,16 +829,17 @@ void CGUIDialogVideoInfo::OnGetFanart()
   {
     CFileItemPtr itemLocal(new CFileItem("fanart://Local",false));
     itemLocal->SetArt("thumb", strLocal);
+    itemLocal->SetIconImage("DefaultPicture.png");
     itemLocal->SetLabel(g_localizeStrings.Get(20438));
 
-    // TODO: Do we need to clear the cached image?
+    //! @todo Do we need to clear the cached image?
     CTextureCache::GetInstance().ClearCachedImage(strLocal);
     items.Add(itemLocal);
   }
   else
   {
     CFileItemPtr itemNone(new CFileItem("fanart://None", false));
-    itemNone->SetIconImage("DefaultVideo.png");
+    itemNone->SetIconImage("DefaultPicture.png");
     itemNone->SetLabel(g_localizeStrings.Get(20439));
     items.Add(itemNone);
   }
@@ -1755,7 +1766,7 @@ bool CGUIDialogVideoInfo::ManageVideoItemArtwork(const CFileItemPtr &item, const
       item->SetLabel(g_localizeStrings.Get(13513));
       items.Add(item);
 
-      // TODO: Do we need to clear the cached image?
+      //! @todo Do we need to clear the cached image?
       //    CTextureCache::GetInstance().ClearCachedImage(thumbs[i]);
     }
 

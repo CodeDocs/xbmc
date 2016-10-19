@@ -23,6 +23,7 @@
 #include "input/joysticks/JoystickTypes.h"
 
 #include <string>
+#include <vector>
 
 class CEvent;
 
@@ -166,7 +167,7 @@ namespace GAME
      * \return The next direction to be prompted, or UNKNOWN if this isn't an
      *         analog stick or the prompt is finished
      */
-    virtual JOYSTICK::CARDINAL_DIRECTION GetDirection(void) const = 0;
+    virtual JOYSTICK::ANALOG_STICK_DIRECTION GetDirection(void) const = 0;
 
     /*!
      * \brief Reset button after prompting for input has finished

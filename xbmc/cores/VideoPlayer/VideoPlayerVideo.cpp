@@ -77,6 +77,7 @@ CVideoPlayerVideo::CVideoPlayerVideo(CDVDClock* pClock
 
   m_bRenderSubs = false;
   m_stalled = false;
+  m_paused = false;
   m_syncState = IDVDStreamPlayer::SYNC_STARTING;
   m_iSubtitleDelay = 0;
   m_iLateFrames = 0;
@@ -119,6 +120,8 @@ double CVideoPlayerVideo::GetOutputDelay()
 
 bool CVideoPlayerVideo::OpenStream( CDVDStreamInfo &hint )
 {
+  m_processInfo.ResetVideoCodecInfo();
+
   CRenderInfo info;
   info = m_renderManager.GetRenderInfo();
 
@@ -155,11 +158,13 @@ void CVideoPlayerVideo::OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec)
   {
     m_fFrameRate = DVD_TIME_BASE / CDVDCodecUtils::NormalizeFrameduration((double)DVD_TIME_BASE * hint.fpsscale / hint.fpsrate);
     m_bFpsInvalid = false;
+    m_processInfo.SetVideoFps(m_fFrameRate);
   }
   else
   {
     m_fFrameRate = 25;
     m_bFpsInvalid = true;
+    m_processInfo.SetVideoFps(0);
   }
 
   m_pullupCorrection.ResetVFRDetection();
@@ -190,6 +195,7 @@ void CVideoPlayerVideo::OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec)
   m_pVideoCodec = codec;
   m_hints   = hint;
   m_stalled = m_messageQueue.GetPacketCount(CDVDMsg::DEMUXER_PACKET) == 0;
+  m_rewindStalled = false;
   m_packets.clear();
   m_syncState = IDVDStreamPlayer::SYNC_STARTING;
 }
@@ -250,6 +256,7 @@ void CVideoPlayerVideo::Process()
   m_videoStats.Start();
   m_droppingStats.Reset();
   m_iDroppedFrames = 0;
+  m_rewindStalled = false;
 
   while (!m_bStop)
   {
@@ -257,6 +264,9 @@ void CVideoPlayerVideo::Process()
     int iPriority = (m_speed == DVD_PLAYSPEED_PAUSE && m_syncState == IDVDStreamPlayer::SYNC_INSYNC) ? 1 : 0;
 
     if (m_syncState == IDVDStreamPlayer::SYNC_WAITSYNC)
+      iPriority = 1;
+
+    if (m_paused)
       iPriority = 1;
 
     CDVDMsg* pMsg;
@@ -281,8 +291,7 @@ void CVideoPlayerVideo::Process()
       //Okey, start rendering at stream fps now instead, we are likely in a stillframe
       if (!m_stalled)
       {
-        if(m_syncState == IDVDStreamPlayer::SYNC_INSYNC)
-          CLog::Log(LOGINFO, "CVideoPlayerVideo - Stillframe detected, switching to forced %f fps", m_fFrameRate);
+        CLog::Log(LOGINFO, "CVideoPlayerVideo - Stillframe detected, switching to forced %f fps", m_fFrameRate);
         m_stalled = true;
         pts += frametime * 4;
       }
@@ -313,6 +322,7 @@ void CVideoPlayerVideo::Process()
 
       m_syncState = IDVDStreamPlayer::SYNC_INSYNC;
       m_droppingStats.Reset();
+      m_rewindStalled = false;
 
       CLog::Log(LOGDEBUG, "CVideoPlayerVideo - CDVDMsg::GENERAL_RESYNC(%f)", pts);
     }
@@ -329,6 +339,7 @@ void CVideoPlayerVideo::Process()
       m_packets.clear();
       m_droppingStats.Reset();
       m_syncState = IDVDStreamPlayer::SYNC_STARTING;
+      m_rewindStalled = false;
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_FLUSH)) // private message sent by (CVideoPlayerVideo::Flush())
     {
@@ -338,10 +349,11 @@ void CVideoPlayerVideo::Process()
       m_picture.iFlags &= ~DVP_FLAG_ALLOCATED;
       m_packets.clear();
       pts = 0;
+      m_rewindStalled = false;
 
       m_pullupCorrection.Flush();
       //we need to recalculate the framerate
-      //TODO: this needs to be set on a streamchange instead
+      //! @todo this needs to be set on a streamchange instead
       ResetFrameRateCalc();
       m_droppingStats.Reset();
 
@@ -395,6 +407,11 @@ void CVideoPlayerVideo::Process()
         if (decoderState & VC_BUFFER)
           break;
       }
+    }
+    else if (pMsg->IsType(CDVDMsg::GENERAL_PAUSE))
+    {
+      m_paused = static_cast<CDVDMsgBool*>(pMsg)->m_value;
+      CLog::Log(LOGDEBUG, "CVideoPlayerVideo - CDVDMsg::GENERAL_PAUSE: %d", m_paused);
     }
     else if (pMsg->IsType(CDVDMsg::DEMUXER_PACKET))
     {
@@ -603,13 +620,15 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(int &decoderState, double &frametim
 
       frametime = (double)DVD_TIME_BASE / m_fFrameRate;
 
-      if (m_syncState == IDVDStreamPlayer::SYNC_STARTING && !(m_picture.iFlags & DVP_FLAG_DROPPED))
+      if (m_syncState == IDVDStreamPlayer::SYNC_STARTING &&
+          !(iResult & EOS_DROPPED) &&
+          !(m_picture.iFlags & DVP_FLAG_DROPPED))
       {
         m_syncState = IDVDStreamPlayer::SYNC_WAITSYNC;
         SStartMsg msg;
         msg.player = VideoPlayer_VIDEO;
-        msg.cachetime = DVD_MSEC_TO_TIME(50); // TODO
-        msg.cachetotal = DVD_MSEC_TO_TIME(100); // TODO
+        msg.cachetime = DVD_MSEC_TO_TIME(50); //! @todo implement
+        msg.cachetotal = DVD_MSEC_TO_TIME(100); //! @todo implement
         msg.timestamp = hasTimestamp ? pts : DVD_NOPTS_VALUE;
         m_messageParent.Put(new CDVDMsgType<SStartMsg>(CDVDMsg::PLAYER_STARTED, msg));
       }
@@ -782,15 +801,10 @@ int CVideoPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
 
   int result = 0;
 
-  //correct any pattern in the timestamps
-  if (picture.format != RENDER_FMT_BYPASS)
-  {
-    m_pullupCorrection.Add(pts);
-    pts += m_pullupCorrection.GetCorrection();
-  }
-
   //try to calculate the framerate
-  CalcFrameRate();
+  m_pullupCorrection.Add(pts);
+  if (!m_stalled)
+    CalcFrameRate();
 
   // signal to clock what our framerate is, it may want to adjust it's
   // speed to better match with our video renderer's output speed
@@ -812,6 +826,7 @@ int CVideoPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
     {
       if (inputPts >= renderPts)
       {
+        m_rewindStalled = true;
         Sleep(50);
       }
       return result | EOS_DROPPED;
@@ -848,13 +863,20 @@ int CVideoPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
   }
 
   // set fieldsync if picture is interlaced
+  EINTERLACEMETHOD deintMethod = EINTERLACEMETHOD::VS_INTERLACEMETHOD_NONE;
   EFIELDSYNC mDisplayField = FS_NONE;
-  if( pPicture->iFlags & DVP_FLAG_INTERLACED )
+  if (pPicture->iFlags & DVP_FLAG_INTERLACED)
   {
-    if( pPicture->iFlags & DVP_FLAG_TOP_FIELD_FIRST )
-      mDisplayField = FS_TOP;
+    deintMethod = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_InterlaceMethod;
+    if (m_processInfo.Supports(deintMethod))
+    {
+      if (pPicture->iFlags & DVP_FLAG_TOP_FIELD_FIRST)
+        mDisplayField = FS_TOP;
+      else
+        mDisplayField = FS_BOT;
+    }
     else
-      mDisplayField = FS_BOT;
+      deintMethod = EINTERLACEMETHOD::VS_INTERLACEMETHOD_NONE;
   }
 
   int timeToDisplay = DVD_TIME_TO_MSEC(pts - iPlayingClock);
@@ -888,7 +910,7 @@ int CVideoPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
     return EOS_DROPPED;
   }
 
-  m_renderManager.FlipPage(m_bAbortOutput, pts, -1, mDisplayField);
+  m_renderManager.FlipPage(m_bAbortOutput, pts, deintMethod, mDisplayField, (m_syncState == ESyncState::SYNC_STARTING));
 
   return result;
 }
@@ -1013,6 +1035,7 @@ void CVideoPlayerVideo::CalcFrameRate()
         CLog::Log(LOGDEBUG,"%s framerate was:%f calculated:%f", __FUNCTION__, m_fFrameRate, m_fStableFrameRate / m_iFrameRateCount);
         m_fFrameRate = m_fStableFrameRate / m_iFrameRateCount;
         m_bFpsInvalid = false;
+        m_processInfo.SetVideoFps(m_fFrameRate);
       }
 
       //reset the stored framerates
@@ -1036,7 +1059,6 @@ int CVideoPlayerVideo::CalcDropRequirement(double pts)
   int result = 0;
   int lateframes;
   double iDecoderPts, iRenderPts;
-  double interval;
   int iSkippedPicture = -1;
   int iDroppedFrames = -1;
   int    iBufferLevel;
@@ -1062,8 +1084,6 @@ int CVideoPlayerVideo::CalcDropRequirement(double pts)
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
       CLog::Log(LOGDEBUG,"CVideoPlayerVideo::CalcDropRequirement - hurry: %d", iBufferLevel);
   }
-
-  interval = 1/m_fFrameRate*(double)DVD_TIME_BASE;
 
   if (m_bAllowDrop)
   {

@@ -19,7 +19,9 @@
  *
  */
 
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "addons/Addon.h"
 #include "addons/Repository.h"
@@ -92,7 +94,8 @@ public:
    */
   bool HasJob(const std::string& ID) const;
 
-  void InstallUpdates(bool includeBlacklisted = false);
+  /*! Install update and block until all updates have installed. */
+  void InstallUpdates();
 
   void OnJobComplete(unsigned int jobID, bool success, CJob* job);
   void OnJobProgress(unsigned int jobID, unsigned int progress, unsigned int total, const CJob *job);
@@ -150,6 +153,7 @@ private:
 
   CCriticalSection m_critSection;
   JobMap m_downloadJobs;
+  CEvent m_idle;
 };
 
 class CAddonInstallJob : public CFileOperationJob

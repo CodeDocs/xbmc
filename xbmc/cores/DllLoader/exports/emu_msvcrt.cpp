@@ -34,7 +34,7 @@
 #endif
 #include <sys/stat.h>
 #include <sys/types.h>
-#if !defined(TARGET_FREEBSD)
+#if !defined(TARGET_FREEBSD) && (!defined(TARGET_ANDROID) && defined(__LP64__))
 #include <sys/timeb.h>
 #endif
 #include "system.h" // for HAS_DVD_DRIVE
@@ -877,11 +877,6 @@ extern "C"
     while ((iDirSlot < MAX_OPEN_DIRS) && (vecDirsOpen[iDirSlot].curr_index != -1)) iDirSlot++;
     if (iDirSlot >= MAX_OPEN_DIRS)
       return -1; // no free slots
-    if (url.IsProtocol("filereader"))
-    {
-      CURL url2(url.GetFileName());
-      url = url2;
-    }
     strURL = url.Get();
     bVecDirsInited = true;
     vecDirsOpen[iDirSlot].items.Clear();
@@ -1000,12 +995,6 @@ extern "C"
     {
       CLog::Log(LOGDEBUG, "Dll: Max open dirs reached");
       return NULL; // no free slots
-    }
-
-    if (url.IsProtocol("filereader"))
-    {
-      CURL url2(url.GetFileName());
-      url = url2;
     }
 
     bVecDirsInited = true;

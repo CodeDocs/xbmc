@@ -61,9 +61,8 @@ bool CGUIControllerList::Initialize(void)
   if (m_controllerButton)
     m_controllerButton->SetVisible(false);
 
+  CAddonMgr::GetInstance().Events().Subscribe(this, &CGUIControllerList::OnEvent);
   Refresh();
-
-  CAddonMgr::GetInstance().RegisterObserver(this);
 
   return m_controllerList != nullptr &&
          m_controllerButton != nullptr;
@@ -71,7 +70,7 @@ bool CGUIControllerList::Initialize(void)
 
 void CGUIControllerList::Deinitialize(void)
 {
-  CAddonMgr::GetInstance().UnregisterObserver(this);
+  CAddonMgr::GetInstance().Events().Unsubscribe(this);
 
   CleanupButtons();
 
@@ -114,7 +113,7 @@ void CGUIControllerList::OnFocus(unsigned int controllerIndex)
     const ControllerPtr& controller = m_controllers[controllerIndex];
     m_featureList->Load(controller);
 
-    // TODO: Activate controller for all game controller controls
+    //! @todo Activate controller for all game controller controls
     CGUIGameController* pController = dynamic_cast<CGUIGameController*>(m_guiWindow->GetControl(CONTROL_GAME_CONTROLLER));
     if (pController)
       pController->ActivateController(controller);
@@ -132,7 +131,7 @@ void CGUIControllerList::ResetController(void)
   {
     const std::string strControllerId = m_controllers[m_focusedController]->ID();
 
-    // TODO: Choose peripheral
+    //! @todo Choose peripheral
     // For now, ask the user if they would like to reset all peripherals
     // "Reset controller profile"
     // "Would you like to reset this controller profile for all devices?"
@@ -143,12 +142,11 @@ void CGUIControllerList::ResetController(void)
   }
 }
 
-void CGUIControllerList::Notify(const Observable& obs, const ObservableMessage msg)
+void CGUIControllerList::OnEvent(const ADDON::AddonEvent& event)
 {
-  using namespace KODI::MESSAGING;
-
-  if (msg == ObservableMessageAddons)
+  if (typeid(event) == typeid(ADDON::AddonEvents::InstalledChanged))
   {
+    using namespace KODI::MESSAGING;
     CGUIMessage msg(GUI_MSG_REFRESH_LIST, m_guiWindow->GetID(), CONTROL_CONTROLLER_LIST);
     CApplicationMessenger::GetInstance().SendGUIMessage(msg);
   }
@@ -175,8 +173,6 @@ bool CGUIControllerList::RefreshControllers(void)
   // Erase removed controllers
   for (const std::string& addonId : removed)
     UnregisterController(addonId);
-
-
 
   // Sort add-ons, with default controller first
   const bool bChanged = !added.empty() || !removed.empty();

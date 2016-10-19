@@ -53,7 +53,11 @@ namespace PERIPHERALS
     virtual ~CPeripheralAddon(void);
 
     // implementation of IAddon
+    virtual void OnDisabled() override;
+    virtual void OnEnabled() override;
     virtual ADDON::AddonPtr GetRunningInstance(void) const override;
+    virtual void OnPostInstall(bool update, bool modal) override;
+    virtual void OnPostUnInstall() override;
 
     /*!
      * @brief Initialise the instance of this add-on
@@ -75,6 +79,7 @@ namespace PERIPHERALS
     //@{
     bool PerformDeviceScan(PeripheralScanResults &results);
     bool ProcessEvents(void);
+    bool SendRumbleEvent(unsigned int index, unsigned int driverIndex, float magnitude);
     //@}
 
     /** @name Joystick methods */
@@ -82,13 +87,15 @@ namespace PERIPHERALS
     bool GetJoystickProperties(unsigned int index, CPeripheralJoystick& joystick);
     bool HasButtonMaps(void) const { return m_bProvidesButtonMaps; }
     bool GetFeatures(const CPeripheral* device, const std::string& strControllerId, FeatureMap& features);
-    bool MapFeatures(const CPeripheral* device, const std::string& strControllerId, const FeatureMap& features);
+    bool MapFeature(const CPeripheral* device, const std::string& strControllerId, const ADDON::JoystickFeature& feature);
+    void SaveButtonMap(const CPeripheral* device);
     void ResetButtonMap(const CPeripheral* device, const std::string& strControllerId);
+    void PowerOffJoystick(unsigned int index);
     //@}
 
     void RegisterButtonMap(CPeripheral* device, JOYSTICK::IButtonMap* buttonMap);
     void UnregisterButtonMap(JOYSTICK::IButtonMap* buttonMap);
-    void RefreshButtonMaps(const std::string& strDeviceName = "", const std::string& strControllerId = "");
+    void RefreshButtonMaps(const std::string& strDeviceName = "");
 
   protected:
     /*!

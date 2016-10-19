@@ -512,6 +512,9 @@ bool CGUIMediaWindow::OnMessage(CGUIMessage& message)
       if (message.GetParam2() == PLUGIN_REFRESH_DELAY)
       {
         Refresh();
+        SetInitialVisibility();
+        RestoreControlStates();
+        SetInitialVisibility();
         return true;
       }
     }
@@ -653,16 +656,7 @@ bool CGUIMediaWindow::GetDirectory(const std::string &strDirectory, CFileItemLis
   CLog::Log(LOGDEBUG,"  ParentPath = [%s]", CURL::GetRedacted(strParentPath).c_str());
 
   if (pathToUrl.IsProtocol("plugin"))
-  {
-    //Record usage
-    auto& addonId = pathToUrl.GetHostName();
-    auto time = CDateTime::GetCurrentDateTime();
-    CJobManager::GetInstance().Submit([addonId, time](){
-      CAddonDatabase db;
-      if (db.Open())
-        db.SetLastUsed(addonId, time);
-    });
-  }
+    CAddonMgr::GetInstance().UpdateLastUsed(pathToUrl.GetHostName());
 
   // see if we can load a previously cached folder
   CFileItemList cachedItems(strDirectory);
@@ -678,7 +672,7 @@ bool CGUIMediaWindow::GetDirectory(const std::string &strDirectory, CFileItemLis
       SetupShares();
     
     CFileItemList dirItems;
-    if (!m_rootDir.GetDirectory(pathToUrl, dirItems))
+    if (!m_rootDir.GetDirectory(pathToUrl, dirItems, UseFileDirectories()))
       return false;
     
     // assign fetched directory items
@@ -696,7 +690,14 @@ bool CGUIMediaWindow::GetDirectory(const std::string &strDirectory, CFileItemLis
   // update the view state's reference to the current items
   m_guiState.reset(CGUIViewState::GetViewState(GetID(), items));
 
-  if (m_guiState.get() && !m_guiState->HideParentDirItems() && items.GetPath() != GetRootPath())
+  bool bHideParent = false;
+
+  if (m_guiState && m_guiState->HideParentDirItems())
+    bHideParent = true;
+  if (items.GetPath() == GetRootPath())
+    bHideParent = true;
+
+  if (!bHideParent)
   {
     CFileItemPtr pItem(new CFileItem(".."));
     pItem->SetPath(strParentPath);
@@ -708,10 +709,10 @@ bool CGUIMediaWindow::GetDirectory(const std::string &strDirectory, CFileItemLis
   int iWindow = GetID();
   std::vector<std::string> regexps;
 
-  // TODO: Do we want to limit the directories we apply the video ones to?
+  //! @todo Do we want to limit the directories we apply the video ones to?
   if (iWindow == WINDOW_VIDEO_NAV)
     regexps = g_advancedSettings.m_videoExcludeFromListingRegExps;
-  if (iWindow == WINDOW_MUSIC_FILES || iWindow == WINDOW_MUSIC_NAV)
+  if (iWindow == WINDOW_MUSIC_NAV)
     regexps = g_advancedSettings.m_audioExcludeFromListingRegExps;
   if (iWindow == WINDOW_PICTURES)
     regexps = g_advancedSettings.m_pictureExcludeFromListingRegExps;
@@ -736,7 +737,7 @@ bool CGUIMediaWindow::GetDirectory(const std::string &strDirectory, CFileItemLis
 
 bool CGUIMediaWindow::Update(const std::string &strDirectory, bool updateFilterPath /* = true */)
 {
-  // TODO: OnInitWindow calls Update() before window path has been set properly.
+  //! @todo OnInitWindow calls Update() before window path has been set properly.
   if (strDirectory == "?")
     return false;
 
@@ -789,8 +790,6 @@ bool CGUIMediaWindow::Update(const std::string &strDirectory, bool updateFilterP
   {
     if (iWindow == WINDOW_PICTURES)
       showLabel = 997;
-    else if (iWindow == WINDOW_MUSIC_FILES)
-      showLabel = 998;
     else if (iWindow == WINDOW_FILES)
       showLabel = 1026;
   }
@@ -932,15 +931,8 @@ bool CGUIMediaWindow::OnClick(int iItem, const std::string &player)
     {
       if (!CScriptInvocationManager::GetInstance().Stop(addon->LibPath()))
       {
-        auto time = CDateTime::GetCurrentDateTime();
-
+        CAddonMgr::GetInstance().UpdateLastUsed(addon->ID());
         CScriptInvocationManager::GetInstance().ExecuteAsync(addon->LibPath(), addon);
-
-        CJobManager::GetInstance().Submit([addon, time](){
-          CAddonDatabase db;
-          if (db.Open())
-            db.SetLastUsed(addon->ID(), time);
-        });
       }
       return true;
     }
@@ -1075,7 +1067,7 @@ bool CGUIMediaWindow::HaveDiscOrConnection(const std::string& strPath, int iDriv
   }
   else if (iDriveType==CMediaSource::SOURCE_TYPE_REMOTE)
   {
-    // TODO: Handle not connected to a remote share
+    //! @todo Handle not connected to a remote share
     if ( !g_application.getNetwork().IsConnected() )
     {
       CGUIDialogOK::ShowAndGetInput(CVariant{220}, CVariant{221});
@@ -1271,7 +1263,7 @@ void CGUIMediaWindow::SetHistoryForPath(const std::string& strDirectory)
     URIUtils::RemoveSlashAtEnd(strPath);
 
     CFileItemList items;
-    m_rootDir.GetDirectory(CURL(), items);
+    m_rootDir.GetDirectory(CURL(), items, UseFileDirectories());
 
     m_history.ClearPathHistory();
 
@@ -1625,7 +1617,7 @@ void CGUIMediaWindow::GetContextButtons(int itemNumber, CContextButtons &buttons
   if (!item || item->IsParentFolder())
     return;
 
-  // TODO: FAVOURITES Conditions on masterlock and localisation
+  //! @todo FAVOURITES Conditions on masterlock and localisation
   if (!item->IsParentFolder() && !item->IsPath("add") && !item->IsPath("newplaylist://") &&
       !URIUtils::IsProtocol(item->GetPath(), "newsmartplaylist") && !URIUtils::IsProtocol(item->GetPath(), "newtag") &&
       !URIUtils::IsProtocol(item->GetPath(), "musicsearch") &&
@@ -1871,11 +1863,11 @@ bool CGUIMediaWindow::GetFilteredItems(const std::string &filter, CFileItemList 
       filteredItems.Add(item);
       continue;
     }
-    // TODO: Need to update this to get all labels, ideally out of the displayed info (ie from m_layout and m_focusedLayout)
-    // though that isn't practical.  Perhaps a better idea would be to just grab the info that we should filter on based on
-    // where we are in the library tree.
-    // Another idea is tying the filter string to the current level of the tree, so that going deeper disables the filter,
-    // but it's re-enabled on the way back out.
+    //! @todo Need to update this to get all labels, ideally out of the displayed info (ie from m_layout and m_focusedLayout)
+    //! though that isn't practical.  Perhaps a better idea would be to just grab the info that we should filter on based on
+    //! where we are in the library tree.
+    //! Another idea is tying the filter string to the current level of the tree, so that going deeper disables the filter,
+    //! but it's re-enabled on the way back out.
     std::string match;
     /*    if (item->GetFocusedLayout())
      match = item->GetFocusedLayout()->GetAllText();
@@ -1914,7 +1906,7 @@ bool CGUIMediaWindow::GetAdvanceFilteredItems(CFileItemList &items)
   std::map<std::string, CFileItemPtr> lookup;
   for (int j = 0; j < resultItems.Size(); j++)
   {
-    std::string itemPath = RemoveParameterFromPath(resultItems[j]->GetPath(), "filter");
+    std::string itemPath = CURL(resultItems[j]->GetPath()).GetWithoutOptions();
     StringUtils::ToLower(itemPath);
 
     lookup[itemPath] = resultItems[j];
@@ -1935,7 +1927,7 @@ bool CGUIMediaWindow::GetAdvanceFilteredItems(CFileItemList &items)
     // check if the item is part of the resultItems list
     // by comparing their paths (but ignoring any special
     // options because they differ from filter to filter)
-    std::string path = RemoveParameterFromPath(item->GetPath(), "filter");
+    std::string path = CURL(item->GetPath()).GetWithoutOptions();
     StringUtils::ToLower(path);
 
     std::map<std::string, CFileItemPtr>::iterator itItem = lookup.find(path);
@@ -2008,9 +2000,10 @@ bool CGUIMediaWindow::Filter(bool advanced /* = true */)
 
 std::string CGUIMediaWindow::GetStartFolder(const std::string &dir)
 {
-  std::string lower(dir); StringUtils::ToLower(lower);
-  if (lower == "$root" || lower == "root")
+  if (StringUtils::EqualsNoCase(dir, "$root") ||
+      StringUtils::EqualsNoCase(dir, "root"))
     return "";
+
   return dir;
 }
 

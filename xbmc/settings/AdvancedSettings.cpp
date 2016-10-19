@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "addons/AudioDecoder.h"
+#include "addons/BinaryAddonCache.h"
 #include "addons/IAddon.h"
 #include "Application.h"
 #include "ServiceBroker.h"
@@ -148,7 +149,6 @@ void CAdvancedSettings::Initialize()
   m_videoNonLinStretchRatio = 0.5f;
   m_videoEnableHighQualityHwScalers = false;
   m_videoAutoScaleMaxFps = 30.0f;
-  m_videoDisableBackgroundDeinterlace = false;
   m_videoCaptureUseOcclusionQuery = -1; //-1 is auto detect
   m_videoVDPAUtelecine = false;
   m_videoVDPAUdeintSkipChromaHD = false;
@@ -156,7 +156,6 @@ void CAdvancedSettings::Initialize()
   m_DXVACheckCompatibility = false;
   m_DXVACheckCompatibilityPresent = false;
   m_DXVAForceProcessorRenderer = true;
-  m_DXVANoDeintProcForProgressive = false;
   m_DXVAAllowHqScaling = true;
   m_videoFpsDetect = 1;
   m_videoBusyDialogDelay_ms = 500;
@@ -553,7 +552,6 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetFloat(pElement, "nonlinearstretchratio", m_videoNonLinStretchRatio, 0.01f, 1.0f);
     XMLUtils::GetBoolean(pElement,"enablehighqualityhwscalers", m_videoEnableHighQualityHwScalers);
     XMLUtils::GetFloat(pElement,"autoscalemaxfps",m_videoAutoScaleMaxFps, 0.0f, 1000.0f);
-    XMLUtils::GetBoolean(pElement, "disablebackgrounddeinterlace", m_videoDisableBackgroundDeinterlace);
     XMLUtils::GetInt(pElement, "useocclusionquery", m_videoCaptureUseOcclusionQuery, -1, 1);
     XMLUtils::GetBoolean(pElement,"vdpauInvTelecine",m_videoVDPAUtelecine);
     XMLUtils::GetBoolean(pElement,"vdpauHDdeintSkipChroma",m_videoVDPAUdeintSkipChromaHD);
@@ -645,7 +643,6 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     m_DXVACheckCompatibilityPresent = XMLUtils::GetBoolean(pElement,"checkdxvacompatibility", m_DXVACheckCompatibility);
 
     XMLUtils::GetBoolean(pElement,"forcedxvarenderer", m_DXVAForceProcessorRenderer);
-    XMLUtils::GetBoolean(pElement,"dxvanodeintforprogressive", m_DXVANoDeintProcForProgressive);
     XMLUtils::GetBoolean(pElement, "dxvaallowhqscaling", m_DXVAAllowHqScaling);
     XMLUtils::GetBoolean(pElement, "usedisplaycontrolhwstereo", m_useDisplayControlHWStereo);
     //0 = disable fps detect, 1 = only detect on timestamps with uniform spacing, 2 detect on all timestamps
@@ -903,8 +900,8 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   m_vecTokens.clear();
   CLangInfo::LoadTokens(pRootElement->FirstChild("sorttokens"),m_vecTokens);
 
-  // TODO: Should cache path be given in terms of our predefined paths??
-  //       Are we even going to have predefined paths??
+  //! @todo Should cache path be given in terms of our predefined paths??
+  //! Are we even going to have predefined paths??
   std::string tmp;
   if (XMLUtils::GetPath(pRootElement, "cachepath", tmp))
     m_cachePath = tmp;
@@ -1340,9 +1337,6 @@ void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(const CSetting *se
   list.push_back(std::make_pair(g_localizeStrings.Get(672), LOGFFMPEG));
   list.push_back(std::make_pair(g_localizeStrings.Get(676), LOGAUDIO));
   list.push_back(std::make_pair(g_localizeStrings.Get(680), LOGVIDEO));
-#ifdef HAS_LIBRTMP
-  list.push_back(std::make_pair(g_localizeStrings.Get(673), LOGRTMP));
-#endif
 #ifdef HAS_DBUS
   list.push_back(std::make_pair(g_localizeStrings.Get(674), LOGDBUS));
 #endif

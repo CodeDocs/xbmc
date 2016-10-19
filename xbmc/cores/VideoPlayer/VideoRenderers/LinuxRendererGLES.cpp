@@ -188,19 +188,6 @@ bool CLinuxRendererGLES::Configure(unsigned int width, unsigned int height, unsi
 
   m_iLastRenderBuffer = -1;
 
-  if (m_format == RENDER_FMT_BYPASS)
-  {
-    m_renderFeatures.clear();
-    m_scalingMethods.clear();
-    m_deinterlaceModes.clear();
-    m_deinterlaceMethods.clear();
-
-    g_application.m_pPlayer->GetRenderFeatures(m_renderFeatures);
-    g_application.m_pPlayer->GetDeinterlaceMethods(m_deinterlaceMethods);
-    g_application.m_pPlayer->GetDeinterlaceModes(m_deinterlaceModes);
-    g_application.m_pPlayer->GetScalingMethods(m_scalingMethods);
-  }
-
   return true;
 }
 
@@ -824,6 +811,8 @@ void CLinuxRendererGLES::Render(DWORD flags, int index)
       break;
     }
   }
+  
+  AfterRenderHook(index);
 }
 
 void CLinuxRendererGLES::RenderSinglePass(int index, int field)
@@ -940,7 +929,7 @@ void CLinuxRendererGLES::RenderSinglePass(int index, int field)
 
 void CLinuxRendererGLES::RenderMultiPass(int index, int field)
 {
-  // TODO: Multipass rendering does not currently work! FIX!
+  //! @todo Multipass rendering does not currently work! FIX!
   CLog::Log(LOGERROR, "GLES: MULTIPASS rendering was called! But it doesnt work!!!");
   return;
 
@@ -996,7 +985,7 @@ void CLinuxRendererGLES::RenderMultiPass(int index, int field)
     m_pYUVProgShader->SetField(0);
 
   VerifyGLState();
-//TODO
+//! @todo implement section
 //  glPushAttrib(GL_VIEWPORT_BIT);
 //  glPushAttrib(GL_SCISSOR_BIT);
   glMatrixModview.Push();
@@ -1017,7 +1006,7 @@ void CLinuxRendererGLES::RenderMultiPass(int index, int field)
   }
 
 // 1st Pass to video frame size
-//TODO
+//! @todo implement section
 //  float imgwidth  = planes[0].rect.x2 - planes[0].rect.x1;
 //  float imgheight = planes[0].rect.y2 - planes[0].rect.y1;
 //  if (m_textureTarget == GL_TEXTURE_2D)
@@ -1056,7 +1045,7 @@ void CLinuxRendererGLES::RenderMultiPass(int index, int field)
   glMatrixModview.PopLoad();
   glMatrixProject.PopLoad();
 
-//TODO
+//! @todo implement section
 //  glPopAttrib(); // pop scissor
 //  glPopAttrib(); // pop viewport
   VerifyGLState();
@@ -1091,7 +1080,7 @@ void CLinuxRendererGLES::RenderMultiPass(int index, int field)
 
   VerifyGLState();
 
-//TODO
+//! @todo implement section
 //  imgwidth  /= m_sourceWidth;
 //  imgheight /= m_sourceHeight;
 //
@@ -1199,12 +1188,6 @@ void CLinuxRendererGLES::UploadYV12Texture(int source)
   {
     return;
   }
-
-  bool deinterlacing = false;
-  if (m_currentField == FIELD_FULL)
-    deinterlacing = false;
-  else
-    deinterlacing = true;
 
   glEnable(m_textureTarget);
   VerifyGLState();
@@ -1635,13 +1618,6 @@ void CLinuxRendererGLES::SetTextureFilter(GLenum method)
 
 bool CLinuxRendererGLES::Supports(ERENDERFEATURE feature)
 {
-  // Player controls render, let it dictate available render features
-  if((m_renderMethod & RENDER_BYPASS))
-  {
-    Features::iterator itr = std::find(m_renderFeatures.begin(),m_renderFeatures.end(), feature);
-    return itr != m_renderFeatures.end();
-  }
-
   if(feature == RENDERFEATURE_BRIGHTNESS)
     return true;
 
@@ -1677,81 +1653,13 @@ bool CLinuxRendererGLES::SupportsMultiPassRendering()
   return false;
 }
 
-bool CLinuxRendererGLES::Supports(EDEINTERLACEMODE mode)
-{
-  // Player controls render, let it dictate available deinterlace modes
-  if((m_renderMethod & RENDER_BYPASS))
-  {
-    Features::iterator itr = std::find(m_deinterlaceModes.begin(),m_deinterlaceModes.end(), mode);
-    return itr != m_deinterlaceModes.end();
-  }
-
-  if (mode == VS_DEINTERLACEMODE_OFF)
-    return true;
-
-  if(mode == VS_DEINTERLACEMODE_AUTO
-  || mode == VS_DEINTERLACEMODE_FORCE)
-    return true;
-
-  return false;
-}
-
-bool CLinuxRendererGLES::Supports(EINTERLACEMETHOD method)
-{
-  // Player controls render, let it dictate available deinterlace methods
-  if((m_renderMethod & RENDER_BYPASS))
-  {
-    Features::iterator itr = std::find(m_deinterlaceMethods.begin(),m_deinterlaceMethods.end(), method);
-    return itr != m_deinterlaceMethods.end();
-  }
-
-  if(method == VS_INTERLACEMETHOD_AUTO)
-    return true;
-
-#if !defined(TARGET_ANDROID) && (defined(__i386__) || defined(__x86_64__))
-  if(method == VS_INTERLACEMETHOD_DEINTERLACE
-  || method == VS_INTERLACEMETHOD_DEINTERLACE_HALF)
-#else
-  if(method == VS_INTERLACEMETHOD_RENDER_BOB
-  || method == VS_INTERLACEMETHOD_RENDER_BOB_INVERTED)
-#endif
-    return true;
-
-  return false;
-}
-
 bool CLinuxRendererGLES::Supports(ESCALINGMETHOD method)
 {
-  // Player controls render, let it dictate available scaling methods
-  if((m_renderMethod & RENDER_BYPASS))
-  {
-    Features::iterator itr = std::find(m_scalingMethods.begin(),m_scalingMethods.end(), method);
-    return itr != m_scalingMethods.end();
-  }
-
   if(method == VS_SCALINGMETHOD_NEAREST
   || method == VS_SCALINGMETHOD_LINEAR)
     return true;
 
   return false;
-}
-
-EINTERLACEMETHOD CLinuxRendererGLES::AutoInterlaceMethod()
-{
-  // Player controls render, let it pick the auto-deinterlace method
-  if((m_renderMethod & RENDER_BYPASS))
-  {
-    if (!m_deinterlaceMethods.empty())
-      return ((EINTERLACEMETHOD)m_deinterlaceMethods[0]);
-    else
-      return VS_INTERLACEMETHOD_NONE;
-  }
-
-#if !defined(TARGET_ANDROID) && (defined(__i386__) || defined(__x86_64__))
-  return VS_INTERLACEMETHOD_DEINTERLACE_HALF;
-#else
-  return VS_INTERLACEMETHOD_RENDER_BOB;
-#endif
 }
 
 CRenderInfo CLinuxRendererGLES::GetRenderInfo()

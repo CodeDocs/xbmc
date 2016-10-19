@@ -136,9 +136,6 @@ bool CDVDTeletextData::OpenStream(CDVDStreamInfo &hints)
 
 void CDVDTeletextData::CloseStream(bool bWaitForBuffers)
 {
-  // wait until buffers are empty
-  if (bWaitForBuffers && m_speed > 0) m_messageQueue.WaitUntilEmpty();
-
   m_messageQueue.Abort();
 
   // wait for decode_video thread to end
@@ -609,7 +606,7 @@ void CDVDTeletextData::Process()
                   case 2: /* page key */
                     break; /* ignore */
                   case 3: /* types of PTUs in DRCS */
-                    break; /* TODO */
+                    break; //! @todo implement
                   case 4: /* CLUTs 0/1, only level 3.5 */
                     break; /* ignore */
                   default:

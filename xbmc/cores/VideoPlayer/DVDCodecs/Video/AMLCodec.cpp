@@ -54,11 +54,48 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <linux/videodev2.h>
 
 // amcodec include
 extern "C" {
 #include <amcodec/codec.h>
 }  // extern "C"
+
+class PosixFile
+{
+public:
+  PosixFile() :
+    m_fd(-1)
+  {
+  }
+
+  PosixFile(int fd) :
+    m_fd(fd)
+  {
+  }
+
+  ~PosixFile()
+  {
+    if (m_fd >= 0)
+     close(m_fd);
+  }
+
+  bool Open(const std::string &pathName, int flags)
+  {
+    m_fd = open(pathName.c_str(), flags);
+    return m_fd >= 0;
+  }
+
+  int GetDescriptor() const { return m_fd; }
+
+  int IOControl(unsigned long request, void *param)
+  {
+    return ioctl(m_fd, request, param);
+  }
+
+private:
+  int m_fd;
+};
 
 typedef struct {
   bool          noblock;
@@ -362,44 +399,6 @@ void dumpfile_write(am_private_t *para, void* buf, int bufsiz)
 
   if (para->dumpdemux && para->dumpfile != -1)
     write(para->dumpfile, buf, bufsiz);
-}
-
-/*************************************************************************/
-/*************************************************************************/
-static int64_t get_pts_video()
-{
-  int fd = open("/sys/class/tsync/pts_video", O_RDONLY);
-  if (fd >= 0)
-  {
-    char pts_str[16];
-    int size = read(fd, pts_str, sizeof(pts_str));
-    close(fd);
-    if (size > 0)
-    {
-      unsigned long pts = strtoul(pts_str, NULL, 16);
-      return pts;
-    }
-  }
-
-  CLog::Log(LOGERROR, "get_pts_video: open /tsync/event error");
-  return -1;
-}
-
-static int set_pts_pcrscr(int64_t value)
-{
-  int fd = open("/sys/class/tsync/pts_pcrscr", O_WRONLY);
-  if (fd >= 0)
-  {
-    char pts_str[64];
-    unsigned long pts = (unsigned long)value;
-    sprintf(pts_str, "0x%lx", pts);
-    write(fd, pts_str, strlen(pts_str));
-    close(fd);
-    return 0;
-  }
-
-  CLog::Log(LOGERROR, "set_pts_pcrscr: open pts_pcrscr error");
-  return -1;
 }
 
 static vformat_t codecid_to_vformat(enum AVCodecID id)
@@ -1418,9 +1417,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints)
   m_speed = DVD_PLAYSPEED_NORMAL;
   m_1st_pts = 0;
   m_cur_pts = 0;
-  m_player_pts = 0;
-  m_cur_pictcnt = 0;
-  m_old_pictcnt = 0;
   m_dst_rect.SetRect(0, 0, 0, 0);
   m_zoom = -1;
   m_contrast = -1;
@@ -1429,6 +1425,12 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints)
   m_start_dts = 0;
   m_start_pts = 0;
   m_hints = hints;
+
+  if (!OpenAmlVideo(hints))
+  {
+    CLog::Log(LOGERROR, "CAMLCodec::OpenDecoder - cannot open amlvideo device");
+    return false;
+  }
 
   ShowMainVideo(false);
 
@@ -1597,7 +1599,7 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints)
         am_private->gcodec.param = (void*)(EXTERNAL_PTS | SYNC_OUTSIDE);
       break;
   }
-  am_private->gcodec.param = (void *)((unsigned int)am_private->gcodec.param | (am_private->video_rotation_degree << 16));
+  am_private->gcodec.param = (void *)((std::uintptr_t)am_private->gcodec.param | (am_private->video_rotation_degree << 16));
 
   // translate from generic to firemware version dependent
   m_dll->codec_init_para(&am_private->gcodec, &am_private->vcodec);
@@ -1612,7 +1614,7 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints)
   am_private->dumpdemux = false;
   dumpfile_open(am_private);
 
-  // make sure we are not stuck in pause (amcodec bug)
+  //! @bug make sure we are not stuck in pause (amcodec bug)
   m_dll->codec_resume(&am_private->vcodec);
   m_dll->codec_set_cntl_mode(&am_private->vcodec, TRICKMODE_NONE);
 
@@ -1652,6 +1654,53 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints)
   return true;
 }
 
+bool CAMLCodec::OpenAmlVideo(const CDVDStreamInfo &hints)
+{
+  PosixFilePtr amlVideoFile = std::make_shared<PosixFile>();
+  if (!amlVideoFile->Open("/dev/video10", O_RDONLY | O_NONBLOCK))
+  {
+    CLog::Log(LOGERROR, "CAMLCodec::OpenAmlVideo - cannot open V4L amlvideo device /dev/video10: %s", strerror(errno));
+    return false;
+  }
+
+  m_amlVideoFile = amlVideoFile;
+
+  m_defaultVfmMap = GetVfmMap("default");
+  SetVfmMap("default", "decoder ppmgr deinterlace amlvideo amvideo");
+
+  SysfsUtils::SetInt("/sys/module/amlvideodri/parameters/freerun_mode", 1);
+
+  return true;
+}
+
+std::string CAMLCodec::GetVfmMap(const std::string &name)
+{
+  std::string vfmMap;
+  SysfsUtils::GetString("/sys/class/vfm/map", vfmMap);
+  std::vector<std::string> sections = StringUtils::Split(vfmMap, '\n');
+  std::string sectionMap;
+  for (size_t i = 0; i < sections.size(); ++i)
+  {
+    if (StringUtils::StartsWith(sections[i], name + " {"))
+    {
+      sectionMap = sections[i];
+      break;
+    }
+  }
+
+  int openingBracePos = sectionMap.find('{') + 1;
+  sectionMap = sectionMap.substr(openingBracePos, sectionMap.size() - openingBracePos - 1);
+  StringUtils::Replace(sectionMap, "(0)", "");
+
+  return sectionMap;
+}
+
+void CAMLCodec::SetVfmMap(const std::string &name, const std::string &map)
+{
+  SysfsUtils::SetString("/sys/class/vfm/map", "rm " + name);
+  SysfsUtils::SetString("/sys/class/vfm/map", "add " + name + " " + map);
+}
+
 void CAMLCodec::CloseDecoder()
 {
   CLog::Log(LOGDEBUG, "CAMLCodec::CloseDecoder");
@@ -1674,6 +1723,14 @@ void CAMLCodec::CloseDecoder()
   SysfsUtils::SetInt("/sys/class/tsync/enable", 1);
 
   ShowMainVideo(false);
+
+  CloseAmlVideo();
+}
+
+void CAMLCodec::CloseAmlVideo()
+{
+  m_amlVideoFile.reset();
+  SetVfmMap("default", m_defaultVfmMap);
 }
 
 void CAMLCodec::Reset()
@@ -1711,8 +1768,7 @@ void CAMLCodec::Reset()
   // reset some interal vars
   m_1st_pts = 0;
   m_cur_pts = 0;
-  m_cur_pictcnt = 0;
-  m_old_pictcnt = 0;
+  m_ptsQueue.clear();
   SetSpeed(m_speed);
 }
 
@@ -1723,7 +1779,6 @@ int CAMLCodec::Decode(uint8_t *pData, size_t iSize, double dts, double pts)
 
   if (pData)
   {
-    m_player_pts = pts;
     am_private->am_pkt.data = pData;
     am_private->am_pkt.data_size = iSize;
 
@@ -1743,7 +1798,6 @@ int CAMLCodec::Decode(uint8_t *pData, size_t iSize, double dts, double pts)
     }
     if (am_private->am_pkt.avpts != (int64_t)AV_NOPTS_VALUE)
       am_private->am_pkt.avpts -= m_start_pts;
-
 
     // handle dts, including 31bit wrap, aml can only handle 31
     // bit dts as it uses an int in kernel.
@@ -1801,28 +1855,22 @@ int CAMLCodec::Decode(uint8_t *pData, size_t iSize, double dts, double pts)
   if (iSize < 20)
     target_timesize = 2.0;
 
+  int rtn = 0;
+
   // keep hw buffered demux above 1 second
-  if (GetTimeSize() < target_timesize && m_speed == DVD_PLAYSPEED_NORMAL)
-    return VC_BUFFER;
+  if (GetTimeSize() < target_timesize)
+    rtn |= VC_BUFFER;
 
   // wait until we get a new frame or 25ms,
-  if (m_old_pictcnt == m_cur_pictcnt)
+  if (m_ptsQueue.size() == 0)
     m_ready_event.WaitMSec(25);
 
-  // we must return VC_BUFFER or VC_PICTURE,
-  // default to VC_BUFFER.
-  int rtn = VC_BUFFER;
-  m_player_pts = DVD_NOPTS_VALUE;
-  if (m_old_pictcnt != m_cur_pictcnt)
+  if (m_ptsQueue.size() > 0)
   {
-    m_old_pictcnt++;
-    rtn = VC_PICTURE;
-    m_player_pts = pts;
-    // we got a new pict, try and keep hw buffered demux above 2 seconds.
-    // this, combined with the above 1 second check, keeps hw buffered demux between 1 and 2 seconds.
-    // we also check to make sure we keep from filling hw buffer.
-    if (GetTimeSize() < 2.0 && GetDataSize() < m_vbufsize/3)
-      rtn |= VC_BUFFER;
+    CSingleLock lock(m_ptsQueueMutex);
+    m_cur_pts = m_ptsQueue.front();
+    m_ptsQueue.pop_front();
+    rtn |= VC_PICTURE;
   }
 /*
   CLog::Log(LOGDEBUG, "CAMLCodec::Decode: "
@@ -1830,6 +1878,35 @@ int CAMLCodec::Decode(uint8_t *pData, size_t iSize, double dts, double pts)
     rtn, m_cur_pictcnt, (float)m_cur_pts/PTS_FREQ, (float)am_private->am_pkt.lastpts/PTS_FREQ, GetTimeSize(), GetDataSize());
 */
   return rtn;
+}
+
+int CAMLCodec::DequeueBuffer(int64_t &pts)
+{
+  v4l2_buffer vbuf = { 0 };
+  vbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+  if (m_amlVideoFile->IOControl(VIDIOC_DQBUF, &vbuf) < 0)
+  {
+    if (errno != EAGAIN)
+      CLog::Log(LOGERROR, "CAMLCodec::DequeueBuffer - VIDIOC_DQBUF failed: %s", strerror(errno));
+    return -errno;
+  }
+
+  // Since kernel 3.14 Amlogic changed length and units of PTS values reported here.
+  // To differentiate such PTS values we check for existence of omx_pts_interval_lower
+  // parameter, because it was introduced since kernel 3.14.
+  if (access("/sys/module/amvideo/parameters/omx_pts_interval_lower", F_OK) != -1)
+  {
+    pts = vbuf.timestamp.tv_sec & 0xFFFFFFFF;
+    pts <<= 32;
+    pts += vbuf.timestamp.tv_usec & 0xFFFFFFFF;
+    pts = (pts * PTS_FREQ) / DVD_TIME_BASE;
+  }
+  else
+  {
+    pts = vbuf.timestamp.tv_usec;
+  }
+  return 0;
 }
 
 bool CAMLCodec::GetPicture(DVDVideoPicture *pDvdVideoPicture)
@@ -1843,7 +1920,7 @@ bool CAMLCodec::GetPicture(DVDVideoPicture *pDvdVideoPicture)
 
   pDvdVideoPicture->dts = DVD_NOPTS_VALUE;
   if (m_speed == DVD_PLAYSPEED_NORMAL)
-    pDvdVideoPicture->pts = m_player_pts;
+    pDvdVideoPicture->pts = (double)m_cur_pts / PTS_FREQ * DVD_TIME_BASE;
   else
   {
     if (m_cur_pts == 0)
@@ -1909,7 +1986,7 @@ double CAMLCodec::GetTimeSize()
   if (m_cur_pts == 0)
     m_timesize = (double)(am_private->am_pkt.lastpts - m_1st_pts) / PTS_FREQ;
   else
-    m_timesize = (double)(am_private->am_pkt.lastpts - m_cur_pts) / PTS_FREQ;
+    m_timesize = (double)(am_private->am_pkt.lastpts - GetOMXPts()) / PTS_FREQ;
 
   // lie to VideoPlayer, it is hardcoded to a max of 8 seconds,
   // if you buffer more than 8 seconds, it goes nuts.
@@ -1926,56 +2003,26 @@ void CAMLCodec::Process()
 {
   CLog::Log(LOGDEBUG, "CAMLCodec::Process Started");
 
-  // bump our priority to be level with SoftAE
-  SetPriority(THREAD_PRIORITY_ABOVE_NORMAL);
   while (!m_bStop)
   {
-    int64_t pts_video = 0;
-    if (am_private->am_pkt.lastpts > 0)
+    if (m_dll->codec_poll_cntl(&am_private->vcodec) < 0)
     {
-      // this is a blocking poll that returns every vsync.
-      // since we are running at a higher priority, make sure
-      // we sleep if the call fails or does a timeout.
-      if (m_dll->codec_poll_cntl(&am_private->vcodec) < 0)
-      {
-        CLog::Log(LOGDEBUG, "CAMLCodec::Process: codec_poll_cntl failed");
-        Sleep(10);
-      }
+      CLog::Log(LOGDEBUG, "CAMLCodec::Process: codec_poll_cntl failed");
+      Sleep(10);
+    }
 
-      pts_video = get_pts_video();
-      if (m_cur_pts != pts_video)
+    {
+      CSingleLock lock(m_ptsQueueMutex);
+      int64_t pts = 0;
+      if (DequeueBuffer(pts) == 0)
       {
-        //CLog::Log(LOGDEBUG, "CAMLCodec::Process: pts_video(%lld), pts_video/PTS_FREQ(%f), duration(%f)",
-        //  pts_video, (double)pts_video/PTS_FREQ, 1.0/((double)(pts_video - m_cur_pts)/PTS_FREQ));
-
-        // other threads look at these, do them first
-        m_cur_pts = pts_video;
-        m_cur_pictcnt++;
+        m_ptsQueue.push_back(pts + m_start_pts);
         m_ready_event.Set();
       }
     }
-    else
-    {
-      Sleep(100);
-    }
   }
-  SetPriority(THREAD_PRIORITY_NORMAL);
+
   CLog::Log(LOGDEBUG, "CAMLCodec::Process Stopped");
-}
-
-void CAMLCodec::SetVideoPtsSeconds(const double pts)
-{
-  //CLog::Log(LOGDEBUG, "CAMLCodec::SetVideoPtsSeconds: pts(%f)", pts);
-  if (pts >= 0.0)
-  {
-    int64_t pts_video = (int64_t)(pts * PTS_FREQ);
-    if (m_start_pts != 0)
-      pts_video -= m_start_pts;
-    else if (m_start_dts != 0)
-      pts_video -= m_start_dts;
-
-    set_pts_pcrscr(pts_video);
-  }
 }
 
 void CAMLCodec::ShowMainVideo(const bool show)

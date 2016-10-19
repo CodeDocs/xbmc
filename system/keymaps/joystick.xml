@@ -1,4 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- This file contains the mapping of keys to actions within Kodi.                       -->
+<!--                                                                                      -->
+<!-- The format is:                                                                       -->
+<!--  <window>                                                                            -->
+<!--    <device>                                                                          -->
+<!--      <button>action</button>                                                         -->
+<!--    </device>                                                                         -->
+<!--  </window>                                                                           -->
+<!--                                                                                      -->
+<!-- The <global> section is a fall through - they will only be used if the button is     -->
+<!-- not used in the current window's section.                                            -->
+<!--                                                                                      -->
+<!-- Actions can be built-in functions.                                                   -->
+<!--  eg <B>ActivateWindow(Music)</B>                                                     -->
+<!-- would automatically go to Music on the press of the B button.                        -->
+<!--                                                                                      -->
+<!--                                                                                      -->
+<!-- An empty action removes the corresponding mapping from default and parent keymaps.   -->
+<!-- This is different from a "noop" action, which disables a button.                     -->
+<!--                                                                                      -->
+<!-- More documentation on keymaps can be found on http://kodi.wiki/view/keymaps          -->
 <keymap>
   <global>
     <joystick>
@@ -7,7 +28,7 @@
       <x>ContextMenu</x>
       <y>FullScreen</y>
       <start>ActivateWindow(PlayerControls)</start>
-      <back>Back</back>
+      <back>PreviousMenu</back>
       <guide>ActivateWindow(Home)</guide>
       <up>Up</up>
       <down>Down</down>
@@ -29,25 +50,18 @@
       <rightstickdown>VolumeDown</rightstickdown>
     </joystick>
   </global>
-  <Home>
-    <joystick>
-      <start>Skin.ToggleSetting(HomeViewToggle)</start>
-    </joystick>
-  </Home>
-  <MyFiles>
+  <FileManager>
     <joystick>
       <rightbumper>Highlight</rightbumper>
     </joystick>
-  </MyFiles>
-  <MyMusicPlaylist>
+  </FileManager>
+  <MusicPlaylist>
     <joystick>
       <leftbumper>Delete</leftbumper>
     </joystick>
-  </MyMusicPlaylist>
-  <MyMusicFiles>
-  </MyMusicFiles>
-  <MyMusicLibrary>
-  </MyMusicLibrary>
+  </MusicPlaylist>
+  <Music>
+  </Music>
   <FullscreenVideo>
     <joystick>
       <a>Pause</a>
@@ -115,7 +129,7 @@
     <joystick>
       <a>Pause</a>
       <b>Stop</b>
-      <x>ActivateWindow(VisualisationSettings)</x>
+      <x>ActivateWindow(AddonSettings)</x>
       <y>ActivateWindow(VisualisationPresetList)</y>
       <start>Info</start>
       <rightthumb>ActivateWindow(MusicOSD)</rightthumb>
@@ -137,11 +151,6 @@
       <start>Info</start>
     </joystick>
   </MusicOSD>
-  <VisualisationSettings>
-    <joystick>
-      <b>Close</b>
-    </joystick>
-  </VisualisationSettings>
   <VisualisationPresetList>
     <joystick>
       <b>Close</b>
@@ -153,7 +162,7 @@
       <b>Stop</b>
       <y>ZoomNormal</y>
       <leftbumper>Rotate</leftbumper>
-      <rightbumper>CodecInfo</rightbumper>
+      <rightbumper>Info</rightbumper>
       <up>ZoomIn</up>
       <down>ZoomOut</down>
       <left>PreviousPicture</left>
@@ -173,13 +182,13 @@
       <rightbumper>NextCalibration</rightbumper>
     </joystick>
   </ScreenCalibration>
-  <GUICalibration>
+  <ScreenCalibration>
     <joystick>
       <x>ResetCalibration</x>
       <leftbumper>NextResolution</leftbumper>
       <rightbumper>NextCalibration</rightbumper>
     </joystick>
-  </GUICalibration>
+  </ScreenCalibration>
   <VideoOSD>
     <joystick>
       <b>Close</b>
@@ -210,15 +219,13 @@
       <leftbumper>Delete</leftbumper>
     </joystick>
   </VideoBookmarks>
-  <MyVideoLibrary>
-  </MyVideoLibrary>
-  <MyVideoFiles>
-  </MyVideoFiles>
-  <MyVideoPlaylist>
+  <Videos>
+  </Videos>
+  <VideoPlaylist>
     <joystick>
       <leftbumper>Delete</leftbumper>
     </joystick>
-  </MyVideoPlaylist>
+  </VideoPlaylist>
   <VirtualKeyboard>
     <joystick>
       <b>BackSpace</b>
@@ -234,11 +241,6 @@
       <b>Close</b>
     </joystick>
   </ContextMenu>
-  <Scripts>
-    <joystick>
-      <x>ContextMenu</x>
-    </joystick>
-  </Scripts>
   <Settings>
     <joystick>
       <b>PreviousMenu</b>

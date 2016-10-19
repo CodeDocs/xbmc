@@ -34,7 +34,7 @@
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "music/MusicDatabase.h"
-#include "cores/AudioEngine/DSPAddons/ActiveAEDSP.h"
+#include "cores/AudioEngine/Engines/ActiveAE/AudioDSPAddons/ActiveAEDSP.h"
 #include "xbmc/music/tags/MusicInfoTag.h"
 
 bool CSaveFileStateJob::DoWork()
@@ -51,7 +51,7 @@ bool CSaveFileStateJob::DoWork()
       progressTrackingFile = original;
   }
 
-  if (progressTrackingFile != "")
+  if (!progressTrackingFile.empty())
   {
 #ifdef HAS_UPNP
     // checks if UPnP server of this file is available and supports updating

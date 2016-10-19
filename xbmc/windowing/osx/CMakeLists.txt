@@ -1,4 +1,4 @@
-if(CORE_SYSTEM_NAME STREQUAL darwin)
+if(CORE_SYSTEM_NAME STREQUAL osx)
   set(SOURCES WinEventsOSX.mm
               WinSystemOSX.mm
               WinSystemOSXGL.mm)
@@ -15,4 +15,3 @@ if(CORE_SYSTEM_NAME STREQUAL ios)
 endif()
 
 core_add_library(windowing_osx)
-add_dependencies(windowing_osx libcpluff)

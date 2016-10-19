@@ -57,6 +57,8 @@ class IRenderMsg
 protected:
   virtual void VideoParamsChange() = 0;
   virtual void GetDebugInfo(std::string &audio, std::string &video, std::string &general) = 0;
+  virtual void UpdateClockSync(bool enabled) = 0;
+  virtual void UpdateRenderInfo(CRenderInfo &info) = 0;
 };
 
 class CRenderManager
@@ -91,12 +93,8 @@ public:
 
   // Functions called from GUI
   bool Supports(ERENDERFEATURE feature);
-  bool Supports(EDEINTERLACEMODE method);
-  bool Supports(EINTERLACEMETHOD method);
   bool Supports(ESCALINGMETHOD method);
-  EINTERLACEMETHOD AutoInterlaceMethod(EINTERLACEMETHOD mInt);
 
-  float GetMaximumFPS();
   int GetSkippedFrames()  { return m_QueueSkip; }
 
   // Functions called from mplayer
@@ -123,10 +121,11 @@ public:
    * @param bStop reference to stop flag of calling thread
    * @param timestamp of frame delivered with AddVideoPicture
    * @param pts used for lateness detection
-   * @param source depreciated
+   * @param method for deinterlacing
    * @param sync signals frame, top, or bottom field
+   * @param wait: block until pic has been rendered
    */
-  void FlipPage(volatile std::atomic_bool& bStop, double pts = 0.0, int source = -1, EFIELDSYNC sync = FS_NONE);
+  void FlipPage(volatile std::atomic_bool& bStop, double pts, EINTERLACEMETHOD deintMethod, EFIELDSYNC sync, bool wait);
 
   void AddOverlay(CDVDOverlay* o, double pts);
 
@@ -165,7 +164,6 @@ protected:
 
   void PrepareNextRender();
 
-  EINTERLACEMETHOD AutoInterlaceMethodInternal(EINTERLACEMETHOD mInt);
   bool Configure();
   void CreateRenderer();
   void DeleteRenderer();
@@ -243,6 +241,7 @@ protected:
   int m_lateframes;
   double m_presentpts;
   EPRESENTSTEP m_presentstep;
+  bool m_forceNext;
   int m_presentsource;
   XbmcThreads::ConditionVariable  m_presentevent;
   CEvent m_flushEvent;

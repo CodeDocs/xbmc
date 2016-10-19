@@ -46,6 +46,8 @@ VideoPlayerCodec::VideoPlayerCodec()
   m_pResampler = NULL;
   m_needConvert = false;
   m_channels = 0;
+
+  m_processInfo.reset(CProcessInfo::CreateInstance());
 }
 
 VideoPlayerCodec::~VideoPlayerCodec()
@@ -102,8 +104,8 @@ bool VideoPlayerCodec::Init(const CFileItem &file, unsigned int filecache)
     return false;
   }
 
-  // TODO:
-  // convey CFileItem::ContentLookup() into Open()
+  //! @todo
+  //! convey CFileItem::ContentLookup() into Open()
   if (!m_pInputStream->Open())
   {
     CLog::Log(LOGERROR, "%s: Error opening file %s", __FUNCTION__, strFileToOpen.c_str());
@@ -165,7 +167,7 @@ bool VideoPlayerCodec::Init(const CFileItem &file, unsigned int filecache)
 
   CDVDStreamInfo hint(*pStream, true);
 
-  m_pAudioCodec = CDVDFactoryCodec::CreateAudioCodec(hint);
+  m_pAudioCodec = CDVDFactoryCodec::CreateAudioCodec(hint, *m_processInfo.get());
   if (!m_pAudioCodec)
   {
     CLog::Log(LOGERROR, "%s: Could not create audio codec", __FUNCTION__);

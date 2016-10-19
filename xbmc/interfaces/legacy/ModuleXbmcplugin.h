@@ -18,6 +18,8 @@
  *
  */
 
+#include <vector>
+
 #include "Tuple.h"
 #include "AddonString.h"
 #include "ListItem.h"
@@ -129,8 +131,8 @@ namespace XBMCAddon
     /// @param updateListing        [opt] bool - True=this folder should
     ///                             update the current listing/False=Folder
     ///                             is a subfolder(Default).
-    /// @param cacheToDisc          [opt] bool - True=Folder will cache if
-    ///                             extended time(default)/False=this folder
+    /// @param cacheToDisc          [opt] bool - True=Allow folder to be cached
+    ///                             (default)/False=this folder
     ///                             will never cache to disc.
     ///
     ///
@@ -249,6 +251,10 @@ namespace XBMCAddon
     ///
     ///
     /// ------------------------------------------------------------------------
+    /// @python_v13 Added new sort **SORT_METHOD_DATE_TAKEN**, **SORT_METHOD_COUNTRY**,
+    /// **SORT_METHOD_DATEADDED**, **SORT_METHOD_FULLPATH**, **SORT_METHOD_LABEL_IGNORE_FOLDERS**,
+    /// **SORT_METHOD_LASTPLAYED**, **SORT_METHOD_PLAYCOUNT**, **SORT_METHOD_CHANNEL**.
+    /// @python_v17 Added new sort **SORT_METHOD_VIDEO_USER_RATING**.
     ///
     /// **Example:**
     /// ~~~~~~~~~~~~~{.py}

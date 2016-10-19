@@ -100,6 +100,17 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
     case AV_CODEC_ID_H264:
       if (m_hints.width <= CSettings::GetInstance().GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECH264))
         return false;
+      switch(hints.profile)
+      {
+        case FF_PROFILE_H264_HIGH_10:
+        case FF_PROFILE_H264_HIGH_10_INTRA:
+        case FF_PROFILE_H264_HIGH_422:
+        case FF_PROFILE_H264_HIGH_422_INTRA:
+        case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
+        case FF_PROFILE_H264_HIGH_444_INTRA:
+        case FF_PROFILE_H264_CAVLC_444:
+          return false;
+      }
       if ((!aml_support_h264_4k2k()) && ((m_hints.width > 1920) || (m_hints.height > 1088)))
       {
         // 4K is supported only on Amlogic S802/S812 chip
@@ -166,6 +177,10 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
         // HEVC supported only on S805 and S812.
         return false;
       }
+      if ((hints.profile == FF_PROFILE_HEVC_MAIN_10) && !aml_support_hevc_10bit())
+      {
+        return false;
+      }
       m_pFormatName = "am-h265";
       m_bitstream = new CBitstreamConverter();
       m_bitstream->Open(m_hints.codec, (uint8_t*)m_hints.extradata, m_hints.extrasize, true);
@@ -215,6 +230,10 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
       m_videobuffer.iDisplayHeight = ((int)lrint(m_videobuffer.iWidth / m_hints.aspect)) & ~3;
     }
   }
+
+  m_processInfo.SetVideoDecoderName(m_pFormatName, true);
+  m_processInfo.SetVideoDimensions(m_hints.width, m_hints.height);
+  m_processInfo.SetVideoDeintMethod("hardware");
 
   CLog::Log(LOGINFO, "%s: Opened Amlogic Codec", __MODULE_NAME__);
   return true;
@@ -294,7 +313,7 @@ bool CDVDVideoCodecAmlogic::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     m_Codec->GetPicture(&m_videobuffer);
   *pDvdVideoPicture = m_videobuffer;
 
-  CDVDAmlogicInfo* info = new CDVDAmlogicInfo(this, m_Codec);
+  CDVDAmlogicInfo* info = new CDVDAmlogicInfo(this, m_Codec, m_Codec->GetOMXPts());
 
   {
     CSingleLock lock(m_secure);
@@ -573,10 +592,11 @@ void CDVDVideoCodecAmlogic::RemoveInfo(CDVDAmlogicInfo *info)
   m_inflight.erase(m_inflight.find(info));
 }
 
-CDVDAmlogicInfo::CDVDAmlogicInfo(CDVDVideoCodecAmlogic *codec, CAMLCodec *amlcodec)
+CDVDAmlogicInfo::CDVDAmlogicInfo(CDVDVideoCodecAmlogic *codec, CAMLCodec *amlcodec, int omxPts)
   : m_refs(0)
   , m_codec(codec)
   , m_amlCodec(amlcodec)
+  , m_omxPts(omxPts)
 {
 }
 

@@ -21,6 +21,7 @@
 #include "system.h"
 #include "GraphicContext.h"
 #include "Application.h"
+#include "cores/DataCacheCore.h"
 #include "messaging/ApplicationMessenger.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/DisplaySettings.h"
@@ -975,12 +976,9 @@ void CGraphicContext::SetMediaDir(const std::string &strMediaDir)
   m_strMediaDir = strMediaDir;
 }
 
-void CGraphicContext::Flip(bool rendered)
+void CGraphicContext::Flip(bool rendered, bool videoLayer)
 {
-  if (IsFullScreenVideo())
-    g_Windowing.FinishPipeline();
-
-  g_Windowing.PresentRender(rendered);
+  g_Windowing.PresentRender(rendered, videoLayer);
 
   if(m_stereoMode != m_nextStereoMode)
   {

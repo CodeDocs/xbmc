@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "ListItem.h"
 #include "PlayList.h"
 #include "InfoTagVideo.h"
@@ -494,6 +496,16 @@ namespace XBMCAddon
       showSubtitles(...);
 #else
       void showSubtitles(bool bVisible);
+#endif
+
+#ifdef DOXYGEN_SHOULD_USE_THIS
+      ///
+      /// \ingroup python_Player
+      /// @brief \python_func{ DisableSubtitles() }
+      ///-----------------------------------------------------------------------
+      /// @python_v12 Deprecated. Use **showSubtitles** instead.
+      /// @python_v17 Completely removed function.
+      ///
 #endif
 
 #ifdef DOXYGEN_SHOULD_USE_THIS

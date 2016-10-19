@@ -19,6 +19,9 @@
  *
  */
 
+#include <string>
+#include <vector>
+
 #include "XBDateTime.h"
 #include "FileItem.h"
 #include "guilib/GUIControl.h"
@@ -27,7 +30,7 @@
 
 namespace EPG
 {
-  class GridItemsPtr;
+  struct GridItem;
   class CGUIEPGGridContainerModel;
 
   class CGUIEPGGridContainer : public IGUIContainer
@@ -39,6 +42,8 @@ namespace EPG
     CGUIEPGGridContainer(const CGUIEPGGridContainer &other);
 
     virtual CGUIEPGGridContainer *Clone() const { return new CGUIEPGGridContainer(*this); }
+
+    void SetPageControl(int id);
 
     virtual bool OnAction(const CAction &action);
     virtual void OnDown();
@@ -92,12 +97,12 @@ namespace EPG
     void ValidateOffset();
     void UpdateLayout();
 
-    GridItemsPtr *GetItem(int channel);
-    GridItemsPtr *GetNextItem(int channel);
-    GridItemsPtr *GetPrevItem(int channel);
-    GridItemsPtr *GetClosestItem(int channel);
+    GridItem *GetItem(int channel);
+    GridItem *GetNextItem(int channel);
+    GridItem *GetPrevItem(int channel);
+    GridItem *GetClosestItem(int channel);
 
-    int GetItemSize(GridItemsPtr *item);
+    int GetItemSize(GridItem *item);
     int GetBlock(const CGUIListItemPtr &item, int channel);
     int GetRealBlock(const CGUIListItemPtr &item, int channel);
     void MoveToRow(int row);
@@ -135,6 +140,8 @@ namespace EPG
     CGUIListItemLayout *m_programmeLayout;
     CGUIListItemLayout *m_focusedProgrammeLayout;
     CGUIListItemLayout *m_rulerLayout;
+
+    int m_pageControl;
 
     void GetChannelCacheOffsets(int &cacheBefore, int &cacheAfter);
     void GetProgrammeCacheOffsets(int &cacheBefore, int &cacheAfter);
@@ -195,6 +202,6 @@ namespace EPG
     std::unique_ptr<CGUIEPGGridContainerModel> m_updatedGridModel;
     std::unique_ptr<CGUIEPGGridContainerModel> m_outdatedGridModel;
 
-    GridItemsPtr *m_item;
+    GridItem *m_item;
   };
 }

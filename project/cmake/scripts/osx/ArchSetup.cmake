@@ -1,5 +1,5 @@
 if(NOT CMAKE_TOOLCHAIN_FILE)
-  message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE required for darwin. See ${PROJECT_SOURCE_DIR}/README.md")
+  message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE required for osx. See ${PROJECT_SOURCE_DIR}/README.md")
 endif()
 
 set(CORE_MAIN_SOURCE ${CORE_SOURCE_DIR}/xbmc/platform/posix/main.cpp
@@ -16,6 +16,7 @@ if(WITH_ARCH)
 else()
   if(CPU STREQUAL x86_64 OR CPU STREQUAL i386)
     set(ARCH x86-osx)
+    set(NEON False)
   else()
     message(SEND_ERROR "Unknown CPU: ${CPU}")
   endif()

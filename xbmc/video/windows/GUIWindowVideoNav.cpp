@@ -506,8 +506,8 @@ void CGUIWindowVideoNav::LoadVideoInfo(CFileItemList &items)
 
 void CGUIWindowVideoNav::LoadVideoInfo(CFileItemList &items, CVideoDatabase &database, bool allowReplaceLabels)
 {
-  // TODO: this could possibly be threaded as per the music info loading,
-  //       we could also cache the info
+  //! @todo this could possibly be threaded as per the music info loading,
+  //!       we could also cache the info
   if (!items.GetContent().empty() && !items.IsPlugin())
     return; // don't load for listings that have content set and weren't created from plugins
 
@@ -954,6 +954,10 @@ void CGUIWindowVideoNav::GetContextButtons(int itemNumber, CContextButtons &butt
             buttons.Add(CONTEXT_BUTTON_SCAN, 13349);
         }
       }
+
+      if ((!item->HasVideoInfoTag() || item->GetVideoInfoTag()->m_iDbId == -1) && info && info->Content() != CONTENT_NONE)
+        buttons.Add(CONTEXT_BUTTON_SCAN_TO_LIBRARY, 21845);
+
     }
   }
 }
@@ -965,7 +969,7 @@ bool CGUIWindowVideoNav::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
     item = m_vecItems->Get(itemNumber);
   if (CGUIDialogContextMenu::OnContextButton("video", item, button))
   {
-    //TODO should we search DB for entries from plugins?
+    //! @todo should we search DB for entries from plugins?
     if (button == CONTEXT_BUTTON_REMOVE_SOURCE && !item->IsPlugin()
         && !item->IsLiveTV() &&!item->IsRSS() && !URIUtils::IsUPnP(item->GetPath()))
     {
@@ -1040,6 +1044,9 @@ bool CGUIWindowVideoNav::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
       }
       return true;
     }
+  case CONTEXT_BUTTON_SCAN_TO_LIBRARY:
+    CGUIDialogVideoInfo::ShowFor(*item);
+    return true;
 
   default:
     break;

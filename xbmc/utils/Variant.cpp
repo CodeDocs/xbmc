@@ -18,12 +18,12 @@
  *
  */
 
+#include "Variant.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <sstream>
 #include <utility>
-
-#include "Variant.h"
 
 #ifndef strtoll
 #ifdef TARGET_WINDOWS
@@ -127,6 +127,11 @@ double str2double(const std::wstring &str, double fallback /* = 0.0 */)
     return result;
 
   return fallback;
+}
+
+CVariant::CVariant()
+  : m_type{VariantTypeNull}
+{
 }
 
 CVariant CVariant::ConstNullVariant = CVariant::VariantTypeConstNull;

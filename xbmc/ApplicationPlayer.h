@@ -21,9 +21,12 @@
  */
 
 #include <memory>
+#include <string>
+#include <vector>
+
+#include "threads/CriticalSection.h"
 #include "threads/SystemClock.h"
 #include "guilib/Resolution.h"
-#include "cores/playercorefactory/PlayerCoreFactory.h"
 #include "cores/IPlayer.h"
 
 typedef enum
@@ -62,11 +65,11 @@ class CApplicationPlayer
   int m_iVideoStream;
   XbmcThreads::EndTime m_subtitleStreamUpdate;
   int m_iSubtitleStream;
-  
+  XbmcThreads::EndTime m_speedUpdate;
+  float m_fPlaySpeed;
+
 public:
   CApplicationPlayer();
-
-  int m_iPlaySpeed;
 
   // player management
   void CloseFile(bool reopen = false);
@@ -74,13 +77,12 @@ public:
   void ClosePlayerGapless(std::string &playername);
   void CreatePlayer(const std::string &player, IPlayerCallback& callback);
   std::string GetCurrentPlayer();
-  int  GetPlaySpeed() const;
+  float  GetPlaySpeed();
   bool HasPlayer() const;
   PlayBackRet OpenFile(const CFileItem& item, const CPlayerOptions& options);
-  void SetPlaySpeed(int iSpeed, bool bApplicationMuted);
+  void SetPlaySpeed(float speed);
 
   void FrameMove();
-  bool HasFrame();
   void Render(bool clear, uint32_t alpha = 255, bool gui = true);
   void FlushRenderer();
   void SetRenderViewMode(int mode);
@@ -89,8 +91,8 @@ public:
   bool IsRenderingVideo();
   bool IsRenderingGuiLayer();
   bool IsRenderingVideoLayer();
-  bool Supports(EDEINTERLACEMODE mode);
   bool Supports(EINTERLACEMETHOD method);
+  EINTERLACEMETHOD GetDeinterlacingMethodDefault();
   bool Supports(ESCALINGMETHOD method);
   bool Supports(ERENDERFEATURE feature);
   unsigned int RenderCaptureAlloc();
@@ -104,7 +106,6 @@ public:
   bool  CanPause();
   bool  CanRecord();
   bool  CanSeek();
-  bool  ControlsVolume() const;
   void  DoAudioWork();
   void  GetAudioCapabilities(std::vector<int> &audioCaps);
   int   GetAudioStream();
@@ -116,14 +117,10 @@ public:
   int   GetChapter();  
   void  GetChapterName(std::string& strChapterName, int chapterIdx=-1);
   int64_t GetChapterPos(int chapterIdx=-1);
-  void  GetDeinterlaceMethods(std::vector<int> &deinterlaceMethods);
-  void  GetDeinterlaceModes(std::vector<int> &deinterlaceModes);
   float GetPercentage() const;
   std::string GetPlayerState();
   std::string GetPlayingTitle();
   int   GetPreferredPlaylist() const;
-  void  GetRenderFeatures(std::vector<int> &renderFeatures);
-  void  GetScalingMethods(std::vector<int> &scalingMethods);
   bool  GetStreamDetails(CStreamDetails &details);
   int   GetSubtitle();
   void  GetSubtitleCapabilities(std::vector<int> &subCaps);
@@ -143,8 +140,8 @@ public:
   bool  HasRDS() const;
   bool  IsCaching() const;
   bool  IsInMenu() const;
-  bool  IsPaused() const;
-  bool  IsPausedPlayback() const;
+  bool  IsPaused();
+  bool  IsPausedPlayback();
   bool  IsPassthrough() const;
   bool  IsPlaying() const;
   bool  IsPlayingAudio() const;
@@ -176,8 +173,9 @@ public:
   void  SetVideoStream(int iStream);
   void  SetVolume(float volume);
   bool  SwitchChannel(const PVR::CPVRChannelPtr &channel);
-  void  ToFFRW(int iSpeed = 0);
-  
+  void  SetSpeed(float speed);
+  bool SupportsTempo();
+
   protected:
     std::shared_ptr<IPlayer> GetInternal() const;
 };

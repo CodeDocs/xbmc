@@ -310,11 +310,16 @@ void CLangInfo::CRegion::SetGlobalLocale()
     strLocale = "C";
   }
 
-  g_langInfo.m_systemLocale = current_locale; // TODO: move to CLangInfo class
+  g_langInfo.m_systemLocale = current_locale; //! @todo move to CLangInfo class
   std::locale::global(current_locale);
 #endif
   g_charsetConverter.resetSystemCharset();
   CLog::Log(LOGINFO, "global locale set to %s", strLocale.c_str());
+
+#ifdef TARGET_ANDROID
+  // Force UTF8 for, e.g., vsnprintf
+  setlocale(LC_ALL, "C.UTF-8");
+#endif
 }
 
 CLangInfo::CLangInfo()
@@ -667,7 +672,20 @@ bool CLangInfo::SetLanguage(bool& fallback, const std::string &strLanguage /* = 
     }
   }
 
-  LanguageResourcePtr languageAddon = GetLanguageAddon(language);
+  LanguageResourcePtr languageAddon;
+  {
+    std::string addonId = ADDON::CLanguageResource::GetAddonId(language);
+    if (addonId.empty())
+      addonId = CSettings::GetInstance().GetString(CSettings::SETTING_LOCALE_LANGUAGE);
+
+    ADDON::AddonPtr addon;
+    if (ADDON::CAddonMgr::GetInstance().GetAddon(addonId, addon, ADDON::ADDON_RESOURCE_LANGUAGE, false))
+    {
+      languageAddon = std::static_pointer_cast<ADDON::CLanguageResource>(addon);
+      ADDON::CAddonMgr::GetInstance().EnableAddon(languageAddon->ID());
+    }
+  }
+
   if (languageAddon == NULL)
   {
     CLog::Log(LOGWARNING, "CLangInfo: unable to load language \"%s\". Trying to determine matching language addon...", language.c_str());
@@ -750,7 +768,7 @@ bool CLangInfo::SetLanguage(bool& fallback, const std::string &strLanguage /* = 
     auto locale = CSettings::GetInstance().GetString(CSettings::SETTING_LOCALE_LANGUAGE);
     for (const auto& addon : addons)
     {
-      auto path = URIUtils::AddFileToFolder(addon->Path(), "resources/language/");
+      auto path = URIUtils::AddFileToFolder(addon->Path(), "resources", "language/");
       g_localizeStrings.LoadAddonStrings(path, locale, addon->ID());
     }
   }

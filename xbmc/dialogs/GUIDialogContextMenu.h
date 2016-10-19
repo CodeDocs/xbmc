@@ -20,7 +20,9 @@
  *
  */
 
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "guilib/GUIDialog.h"
 
@@ -70,6 +72,7 @@ enum CONTEXT_BUTTON { CONTEXT_BUTTON_CANCELLED = 0,
                       CONTEXT_BUTTON_INFO_ALL,
                       CONTEXT_BUTTON_CDDB,
                       CONTEXT_BUTTON_SCAN,
+                      CONTEXT_BUTTON_SCAN_TO_LIBRARY,
                       CONTEXT_BUTTON_SET_ARTIST_THUMB,
                       CONTEXT_BUTTON_SET_SEASON_ART,
                       CONTEXT_BUTTON_CANCEL_PARTYMODE,
